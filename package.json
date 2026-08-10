@@ -10,6 +10,7 @@
     "dev": "tsx src/index.ts",
     "backtest": "tsx src/backtest/cli.ts",
     "paper": "tsx src/paper/cli.ts",
+    "reconcile": "tsx src/paper/reconcile.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",

@@ -13,6 +13,7 @@ import { RecentIds } from './dedupe.js';
 import { checkSequence } from './gap-detector.js';
 import { logger } from './logger.js';
 import { parseMessage } from './parse.js';
+import { startStatusServer } from './status-server.js';
 import { Storage } from './storage.js';
 import { TradeBuffer } from './trade-buffer.js';
 
@@ -141,6 +142,24 @@ feed.on('down', (reason) => {
   logger.warn({ reason }, 'feed down');
 });
 
+const startedAtMs = Date.now();
+const statusServer = startStatusServer(() => {
+  const connection = feed.stats();
+  return {
+    uptimeSeconds: Math.round((Date.now() - startedAtMs) / 1000),
+    connected: connection.connected,
+    messagesReceived: connection.messagesReceived,
+    lastMessageAt: connection.lastMessageAt,
+    reconnectCount: connection.reconnectCount,
+    gapCount,
+    duplicatesSkipped,
+    lateTrades,
+    buffered: buffer.stats().buffered,
+    tradesWritten: buffer.stats().totalFlushed,
+    barsWritten,
+  };
+});
+
 buffer.start();
 feed.start();
 
@@ -150,6 +169,7 @@ async function shutdown(signal: string): Promise<void> {
   shuttingDown = true;
   logger.info({ signal, duplicatesSkipped, gapCount, lateTrades, barsWritten }, 'shutting down');
   feed.stop();
+  statusServer.close();
   clearInterval(exportTimer);
   clearInterval(finalizeTimer);
   try {

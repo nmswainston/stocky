@@ -1,4 +1,5 @@
-import { ONE, divUnitsDown, fromUnits, mulUnitsDown, mulUnitsUp, toUnits } from '../decimal.js';
+import { fromUnits, mulUnitsDown, toUnits } from '../decimal.js';
+import { executeBuy, executeSell, type CostModel } from './fills.js';
 import { createBarWindow } from './window.js';
 import type {
   BacktestConfig,
@@ -8,6 +9,9 @@ import type {
   Signal,
   Strategy,
 } from './types.js';
+
+// Re-exported so engine consumers keep one import site for cost models.
+export { zeroCosts, type CostModel } from './fills.js';
 
 // The replay loop. Look-ahead is prevented by the shape of this loop,
 // not by discipline inside strategies:
@@ -23,18 +27,6 @@ import type {
 // is the open of a bar the strategy has never seen. Fills are constructed
 // in exactly one place, inside settle. A signal on the final bar has no
 // next open and is reported as undecidedSignalAtEnd instead of executing.
-
-export interface CostModel {
-  buyFillPrice(referenceOpenUnits: bigint): bigint;
-  sellFillPrice(referenceOpenUnits: bigint): bigint;
-  fee(notionalUnits: bigint): bigint;
-}
-
-export const zeroCosts: CostModel = {
-  buyFillPrice: (price) => price,
-  sellFillPrice: (price) => price,
-  fee: () => 0n,
-};
 
 export interface ReplayOptions {
   // Runs every decision twice on structurally cloned state and rejects
@@ -98,73 +90,36 @@ export function runReplay<State>(
     // 1. settle
     if (pending) {
       const decidedAtBar = (bars[pending.decidedAtIndex] as ClosedBar).bucketStart;
+      const site = {
+        executedAtBar: bar.bucketStart,
+        decidedAtBar,
+        referenceOpen: bar.open,
+        openUnits,
+      };
       if (pending.target === 'long' && positionUnits === 0n) {
-        const fillPriceUnits = costs.buyFillPrice(openUnits);
-        const budget = (cashUnits * fractionBps) / 10_000n;
-        // Size so that notional plus its fee fits the budget. Probing the
-        // fee on 1.0 of notional gives the fee rate without assuming the
-        // model is basis points; the decrement loop then only absorbs
-        // rounding, one or two iterations at most.
-        const feePerOne = costs.fee(ONE);
-        const notionalTarget = (budget * ONE) / (ONE + feePerOne);
-        let quantityUnits = divUnitsDown(notionalTarget, fillPriceUnits);
-        let notionalUnits = mulUnitsUp(quantityUnits, fillPriceUnits);
-        let feeUnits = costs.fee(notionalUnits);
-        while (quantityUnits > 0n && notionalUnits + feeUnits > budget) {
-          quantityUnits -= 1n;
-          notionalUnits = mulUnitsUp(quantityUnits, fillPriceUnits);
-          feeUnits = costs.fee(notionalUnits);
-        }
-        if (quantityUnits > 0n) {
-          cashUnits -= notionalUnits + feeUnits;
-          positionUnits += quantityUnits;
-          const grossNotionalUnits = mulUnitsUp(quantityUnits, openUnits);
-          grossCashUnits -= grossNotionalUnits;
-          totalFeesUnits += feeUnits;
-          // Slippage as the exact difference between what was paid and the
-          // frictionless notional, so friction always sums exactly.
-          totalSlippageUnits += notionalUnits - grossNotionalUnits;
-          const fill: Fill = {
-            side: 'BUY',
-            executedAtBar: bar.bucketStart,
-            decidedAtBar,
-            referenceOpen: bar.open,
-            fillPrice: fromUnits(fillPriceUnits),
-            quantity: fromUnits(quantityUnits),
-            notional: fromUnits(notionalUnits),
-            fee: fromUnits(feeUnits),
-          };
-          fills.push(fill);
-          entry = { fill, index, costUnits: notionalUnits + feeUnits };
+        const buy = executeBuy(cashUnits, fractionBps, site, costs);
+        if (buy) {
+          cashUnits -= buy.spentUnits;
+          positionUnits += buy.quantityUnits;
+          grossCashUnits -= buy.grossNotionalUnits;
+          totalFeesUnits += buy.feeUnits;
+          totalSlippageUnits += buy.slippageUnits;
+          fills.push(buy.fill);
+          entry = { fill: buy.fill, index, costUnits: buy.spentUnits };
         }
       } else if (pending.target === 'flat' && positionUnits > 0n) {
-        const fillPriceUnits = costs.sellFillPrice(openUnits);
-        const quantityUnits = positionUnits;
-        const notionalUnits = mulUnitsDown(quantityUnits, fillPriceUnits);
-        const feeUnits = costs.fee(notionalUnits);
-        cashUnits += notionalUnits - feeUnits;
+        const sell = executeSell(positionUnits, site, costs);
+        cashUnits += sell.proceedsUnits;
         positionUnits = 0n;
-        const grossNotionalUnits = mulUnitsDown(quantityUnits, openUnits);
-        grossCashUnits += grossNotionalUnits;
-        totalFeesUnits += feeUnits;
-        totalSlippageUnits += grossNotionalUnits - notionalUnits;
-        const fill: Fill = {
-          side: 'SELL',
-          executedAtBar: bar.bucketStart,
-          decidedAtBar,
-          referenceOpen: bar.open,
-          fillPrice: fromUnits(fillPriceUnits),
-          quantity: fromUnits(quantityUnits),
-          notional: fromUnits(notionalUnits),
-          fee: fromUnits(feeUnits),
-        };
-        fills.push(fill);
+        grossCashUnits += sell.grossNotionalUnits;
+        totalFeesUnits += sell.feeUnits;
+        totalSlippageUnits += sell.slippageUnits;
+        fills.push(sell.fill);
         if (entry) {
-          const proceedsUnits = notionalUnits - feeUnits;
-          const pnlUnits = proceedsUnits - entry.costUnits;
+          const pnlUnits = sell.proceedsUnits - entry.costUnits;
           roundTrips.push({
             entry: entry.fill,
-            exit: fill,
+            exit: sell.fill,
             netPnl: fromUnits(pnlUnits),
             netPnlPct: Number(pnlUnits) / Number(entry.costUnits),
             holdingBars: index - entry.index,

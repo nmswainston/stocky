@@ -1,6 +1,6 @@
 import { addBpsUp, bpsOfUp, subtractBpsDown } from '../decimal.js';
 import type { BacktestConfig } from './types.js';
-import type { CostModel } from './engine.js';
+import type { CostModel } from './fills.js';
 
 // Fees and slippage as basis points, every rounding against the trader.
 //

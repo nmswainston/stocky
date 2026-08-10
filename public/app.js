@@ -2,6 +2,7 @@
 // equity.js; this file only moves data between the API and the charts.
 
 import { countGaps, createPriceChart } from './candles.js';
+import { createEquityChart, fillMarkers, summarize } from './equity.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -86,6 +87,74 @@ el('range-select').addEventListener('change', (event) => {
   scheduleBars();
 });
 
+const equityChart = createEquityChart(el('equity-chart'));
+let selectedBacktest = null;
+
+async function refreshBacktestList() {
+  try {
+    const { backtests } = await fetchJson('/api/backtests');
+    const select = el('backtest-select');
+    const current = select.value;
+    select.innerHTML = '';
+    if (backtests.length === 0) {
+      select.append(new Option('none saved yet', ''));
+      return;
+    }
+    select.append(new Option('select a backtest', ''));
+    for (const summary of backtests) {
+      const pct = summary.totalReturnPct === null
+        ? ''
+        : ` ${(summary.totalReturnPct * 100).toFixed(2)}%`;
+      select.append(
+        new Option(`${summary.strategyName} ${summary.symbol}${pct}`, summary.id),
+      );
+    }
+    if ([...select.options].some((option) => option.value === current)) {
+      select.value = current;
+    }
+  } catch {
+    /* list refresh is best effort; the next tick retries */
+  }
+}
+
+function applyBacktestMarkers() {
+  if (selectedBacktest && selectedBacktest.result.config.symbol === state.symbol) {
+    priceChart.setMarkers(fillMarkers(selectedBacktest.result));
+  } else {
+    priceChart.setMarkers([]);
+  }
+}
+
+el('backtest-select').addEventListener('change', async (event) => {
+  const id = event.target.value;
+  if (!id) {
+    selectedBacktest = null;
+    equityChart.clear();
+    el('backtest-summary').textContent = '';
+    applyBacktestMarkers();
+    return;
+  }
+  try {
+    selectedBacktest = await fetchJson(`/api/backtests/${id}`);
+    const result = selectedBacktest.result;
+    el('backtest-summary').textContent = summarize(result);
+    equityChart.setResult(result);
+    if (result.config.symbol !== state.symbol) {
+      el('symbol-select').value = result.config.symbol;
+      state.symbol = result.config.symbol;
+      await loadBars({ fit: true });
+      scheduleBars();
+    }
+    applyBacktestMarkers();
+  } catch (error) {
+    el('backtest-summary').textContent = `could not load backtest: ${error.message}`;
+  }
+});
+
+el('symbol-select').addEventListener('change', applyBacktestMarkers);
+
 statusLoop();
 loadBars({ fit: true });
 scheduleBars();
+refreshBacktestList();
+setInterval(refreshBacktestList, 30_000);

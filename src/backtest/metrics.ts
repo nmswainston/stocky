@@ -7,7 +7,6 @@ import type { BacktestConfig, BacktestResult, ClosedBar, RoundTrip, Strategy } f
 // ratios, not accounting. Money never flows back out of this module.
 
 const MS_PER_YEAR = 365 * 24 * 60 * 60 * 1000;
-const BAR_MS = 60_000;
 
 export function totalReturnPct(initialUnits: bigint, finalUnits: bigint): number {
   return Number(finalUnits - initialUnits) / Number(initialUnits);
@@ -28,7 +27,7 @@ export function annualizedReturnPct(
 // Sharpe from per-bar simple returns, risk free rate zero, annualized by
 // the square root of bars per year. Sample standard deviation. Null when
 // there is nothing to divide: fewer than two returns, or zero variance.
-export function sharpeRatio(equitySeries: readonly number[]): number | null {
+export function sharpeRatio(equitySeries: readonly number[], barMs: number): number | null {
   if (equitySeries.length < 3) return null;
   const returns: number[] = [];
   for (let i = 1; i < equitySeries.length; i += 1) {
@@ -41,7 +40,7 @@ export function sharpeRatio(equitySeries: readonly number[]): number | null {
   const variance =
     returns.reduce((sum, r) => sum + (r - mean) ** 2, 0) / (returns.length - 1);
   if (variance === 0) return null;
-  const barsPerYear = MS_PER_YEAR / BAR_MS;
+  const barsPerYear = MS_PER_YEAR / barMs;
   return (mean / Math.sqrt(variance)) * Math.sqrt(barsPerYear);
 }
 
@@ -116,11 +115,11 @@ export function winStats(roundTrips: readonly RoundTrip[]): WinStats {
 // Bars the collector should have produced over the span versus bars
 // present. Reported, never repaired: fabricating bridge bars would let
 // strategies trade through collector outages.
-export function missingBarCount(bars: readonly ClosedBar[]): number {
+export function missingBarCount(bars: readonly ClosedBar[], barMs: number): number {
   if (bars.length < 2) return 0;
   const first = Date.parse((bars[0] as ClosedBar).bucketStart);
   const last = Date.parse((bars[bars.length - 1] as ClosedBar).bucketStart);
-  const expected = Math.round((last - first) / BAR_MS) + 1;
+  const expected = Math.round((last - first) / barMs) + 1;
   return expected - bars.length;
 }
 
@@ -131,9 +130,10 @@ export function assembleResult<State>(
   outcome: ReplayOutcome,
 ): BacktestResult {
   const initialUnits = toUnits(config.initialEquity);
+  const barMs = (config.timeframeMinutes ?? 1) * 60_000;
   const firstBar = (bars[0] as ClosedBar).bucketStart;
   const lastBar = (bars[bars.length - 1] as ClosedBar).bucketStart;
-  const spanMs = Date.parse(lastBar) + BAR_MS - Date.parse(firstBar);
+  const spanMs = Date.parse(lastBar) + barMs - Date.parse(firstBar);
 
   const equityNumbers = outcome.equityCurve.map((point) => Number(point.equity));
   const times = outcome.equityCurve.map((point) => point.time);
@@ -147,14 +147,14 @@ export function assembleResult<State>(
       firstBar,
       lastBar,
       barCount: bars.length,
-      missingBars: missingBarCount(bars),
+      missingBars: missingBarCount(bars, barMs),
       warmupBarsExcluded: outcome.warmupBarsExcluded,
     },
     performance: {
       finalEquity: fromUnits(outcome.finalEquityUnits),
       totalReturnPct: totalReturnPct(initialUnits, outcome.finalEquityUnits),
       annualizedReturnPct: annualizedReturnPct(initialUnits, outcome.finalEquityUnits, spanMs),
-      sharpeRatio: sharpeRatio(equityNumbers),
+      sharpeRatio: sharpeRatio(equityNumbers, barMs),
       maxDrawdownPct: drawdown.maxDrawdownPct,
       maxDrawdownDuration: drawdown.duration,
     },

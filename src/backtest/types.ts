@@ -47,6 +47,10 @@ export interface BacktestConfig {
   // so maker fees are never charged. Limit orders would change that.
   makerFeeBps: number;
   slippageBps: number;
+  // Bar duration fed to the replay, in minutes. Defaults to 1. Metrics
+  // need this: annualizing 15 minute bars as if they were 1 minute bars
+  // inflates Sharpe by a factor of sqrt(15).
+  timeframeMinutes?: number;
   from?: string;
   to?: string;
 }

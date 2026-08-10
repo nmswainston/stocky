@@ -1,4 +1,5 @@
 import { numberArg as sharedNumberArg, parseArgs } from '../cli-args.js';
+import { aggregateBars } from './aggregate.js';
 import { basisPointCosts } from './costs.js';
 import { runReplay } from './engine.js';
 import { loadBarsHttp } from './load-bars-http.js';
@@ -20,6 +21,7 @@ const config: BacktestConfig = {
   takerFeeBps: numberArg('taker-bps', 60),
   makerFeeBps: numberArg('maker-bps', 40),
   slippageBps: numberArg('slippage-bps', 5),
+  timeframeMinutes: numberArg('timeframe', 1),
   ...(args.get('from') ? { from: args.get('from') as string } : {}),
   ...(args.get('to') ? { to: args.get('to') as string } : {}),
 };
@@ -62,6 +64,12 @@ async function obtainBars(): Promise<ClosedBar[]> {
 let bars: ClosedBar[];
 try {
   bars = await obtainBars();
+  const timeframe = config.timeframeMinutes ?? 1;
+  if (timeframe > 1) {
+    const oneMinuteCount = bars.length;
+    bars = aggregateBars(bars, timeframe);
+    console.error(`aggregated ${oneMinuteCount} 1m bars into ${bars.length} ${timeframe}m bars`);
+  }
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);

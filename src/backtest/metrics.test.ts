@@ -35,13 +35,20 @@ describe('maxDrawdown', () => {
 
 describe('sharpeRatio', () => {
   it('is null when there is no variance or too little data', () => {
-    expect(sharpeRatio([100, 100, 100, 100])).toBeNull();
-    expect(sharpeRatio([100, 101])).toBeNull();
+    expect(sharpeRatio([100, 100, 100, 100], 60_000)).toBeNull();
+    expect(sharpeRatio([100, 101], 60_000)).toBeNull();
   });
 
   it('is positive for a steady climb with noise', () => {
     const equity = Array.from({ length: 100 }, (_, i) => 100 * 1.001 ** i + (i % 2) * 0.01);
-    expect(sharpeRatio(equity)).toBeGreaterThan(0);
+    expect(sharpeRatio(equity, 60_000)).toBeGreaterThan(0);
+  });
+
+  it('annualizes by bar duration: longer bars, smaller Sharpe', () => {
+    const equity = Array.from({ length: 100 }, (_, i) => 100 * 1.001 ** i + (i % 2) * 0.01);
+    const oneMinute = sharpeRatio(equity, 60_000)!;
+    const fifteenMinute = sharpeRatio(equity, 15 * 60_000)!;
+    expect(oneMinute / fifteenMinute).toBeCloseTo(Math.sqrt(15), 10);
   });
 });
 
@@ -71,7 +78,7 @@ describe('winStats', () => {
 describe('missingBarCount', () => {
   it('reports gaps instead of hiding them', () => {
     const present = [bar(0, '100', '100'), bar(1, '100', '100'), bar(5, '100', '100')];
-    expect(missingBarCount(present)).toBe(3);
-    expect(missingBarCount(present.slice(0, 2))).toBe(0);
+    expect(missingBarCount(present, 60_000)).toBe(3);
+    expect(missingBarCount(present.slice(0, 2), 60_000)).toBe(0);
   });
 });

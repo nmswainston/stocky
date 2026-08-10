@@ -159,7 +159,7 @@ export class Storage {
       tradeCount: number;
     }>
   > {
-    const bounded = Math.min(Math.max(1, Math.floor(limit)), 10_000);
+    const bounded = Math.min(Math.max(1, Math.floor(limit)), 50_000);
     // Newest rows win when the limit bites, then flip back to ascending.
     const result = await this.connection.runAndReadAll(
       `

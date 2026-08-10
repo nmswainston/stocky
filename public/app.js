@@ -1,6 +1,8 @@
 // Page state and fetch loops. Rendering lives in candles.js and
 // equity.js; this file only moves data between the API and the charts.
 
+import { countGaps, createPriceChart } from './candles.js';
+
 const el = (id) => document.getElementById(id);
 
 const state = {
@@ -49,4 +51,41 @@ async function statusLoop() {
   setTimeout(statusLoop, 5_000);
 }
 
+const priceChart = createPriceChart(el('price-chart'));
+let barsTimer = null;
+
+async function loadBars({ fit = false } = {}) {
+  try {
+    const data = await fetchJson(
+      `/api/bars?symbol=${encodeURIComponent(state.symbol)}&limit=${state.rangeMinutes}`,
+    );
+    priceChart.setBars(data.bars, { fit });
+    const missing = countGaps(data.bars);
+    el('bar-info').textContent =
+      `${data.count} bars` + (missing > 0 ? `, ${missing} missing` : '');
+  } catch (error) {
+    el('bar-info').textContent = `bars unavailable: ${error.message}`;
+  }
+}
+
+function scheduleBars() {
+  if (barsTimer) clearInterval(barsTimer);
+  // Bars only change once a minute; refresh on the minute plus slack.
+  barsTimer = setInterval(loadBars, 60_000);
+}
+
+el('symbol-select').addEventListener('change', (event) => {
+  state.symbol = event.target.value;
+  loadBars({ fit: true });
+  scheduleBars();
+});
+
+el('range-select').addEventListener('change', (event) => {
+  state.rangeMinutes = Number(event.target.value);
+  loadBars({ fit: true });
+  scheduleBars();
+});
+
 statusLoop();
+loadBars({ fit: true });
+scheduleBars();

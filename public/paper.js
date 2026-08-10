@@ -51,6 +51,23 @@ export function createPaperChart(container) {
   };
 }
 
+export function paperCardData(state) {
+  const initial = Number(state.config.initialEquity);
+  const last = (curve) =>
+    curve.length > 0 ? Number(curve[curve.length - 1].equity) : initial;
+  const equity = last(state.main.equityCurve);
+  const baseline = last(state.baseline.equityCurve);
+  const returnPct = ((equity - initial) / initial) * 100;
+  const baselinePct = ((baseline - initial) / initial) * 100;
+  return {
+    equity,
+    returnPct,
+    // Percentage points ahead of (positive) or behind (negative) doing
+    // nothing: the number that actually judges a strategy.
+    deltaPoints: returnPct - baselinePct,
+  };
+}
+
 export function paperSummarize(state) {
   const initial = Number(state.config.initialEquity);
   const last = (curve) =>

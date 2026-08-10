@@ -1,0 +1,28 @@
+{
+  "name": "stocky",
+  "version": "0.1.0",
+  "description": "Phase 1: crypto market data collector for Coinbase Advanced Trade",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "@duckdb/node-api": "^1.5.5-r.3",
+    "pino": "^10.3.1",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  }
+}

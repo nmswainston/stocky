@@ -188,7 +188,7 @@ export function runReplay<State>(
       }
     }
     state = decision.state;
-    const warm = index + 1 > strategy.warmupBars;
+    const warm = index + 1 >= strategy.warmupBars;
     const target: Signal = warm ? decision.signal : 'flat';
 
     // 4. queue, only when the target differs from the current position
@@ -207,6 +207,6 @@ export function runReplay<State>(
     totalSlippageUnits,
     openPositionAtEnd: positionUnits > 0n,
     undecidedSignalAtEnd: pending !== null,
-    warmupBarsExcluded: Math.min(strategy.warmupBars, bars.length),
+    warmupBarsExcluded: Math.min(Math.max(strategy.warmupBars - 1, 0), bars.length),
   };
 }

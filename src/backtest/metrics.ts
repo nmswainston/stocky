@@ -59,12 +59,15 @@ export function maxDrawdown(
 ): DrawdownReport {
   let peak = -Infinity;
   let peakIndex = 0;
+  let dipped = false;
   let deepest = 0;
   let longest: { bars: number; from: string; to: string } | null = null;
 
+  // Only a stretch that actually went below the peak counts as
+  // underwater; consecutive new highs are not a drawdown.
   const consider = (endIndex: number): void => {
     const bars = endIndex - peakIndex;
-    if (bars > 0 && (longest === null || bars > longest.bars)) {
+    if (dipped && bars > 0 && (longest === null || bars > longest.bars)) {
       longest = { bars, from: times[peakIndex] as string, to: times[endIndex] as string };
     }
   };
@@ -75,12 +78,14 @@ export function maxDrawdown(
       if (peak !== -Infinity) consider(i);
       peak = equity;
       peakIndex = i;
+      dipped = false;
     } else {
+      dipped = true;
       const drawdown = (peak - equity) / peak;
       if (drawdown > deepest) deepest = drawdown;
     }
   }
-  if (peakIndex < equitySeries.length - 1) consider(equitySeries.length - 1);
+  consider(equitySeries.length - 1);
 
   return { maxDrawdownPct: deepest, duration: longest };
 }

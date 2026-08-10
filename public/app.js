@@ -70,7 +70,7 @@ async function tapeLoop() {
         (trade) =>
           `<div class="tape-row"><span>${trade.time.slice(11, 19)}</span>` +
           `<span class="price ${trade.side === 'BUY' ? 'buy' : 'sell'}">${formatPrice(trade.price)}</span>` +
-          `<span class="size">${Number(trade.size).toFixed(5)}</span></div>`,
+          `<span class="size">${Number(trade.size).toFixed(8).replace(/0+$/, '').replace(/\.$/, '')}</span></div>`,
       )
       .join('');
   } catch {

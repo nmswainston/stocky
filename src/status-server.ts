@@ -31,6 +31,19 @@ export function startStatusServer(snapshot: () => StatusSnapshot): http.Server {
     response.writeHead(404, { 'content-type': 'application/json' });
     response.end(JSON.stringify({ error: 'not found' }));
   });
+  // Without this handler a taken port (usually a second instance of the
+  // collector) crashes the process with an unhandled exception.
+  server.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code === 'EADDRINUSE') {
+      log.fatal(
+        { port: config.status.port },
+        'status port already in use, is another instance running?',
+      );
+    } else {
+      log.fatal({ err: error }, 'status server failed');
+    }
+    process.exit(1);
+  });
   server.listen(config.status.port, config.status.host, () => {
     log.info({ host: config.status.host, port: config.status.port }, 'status server listening');
   });

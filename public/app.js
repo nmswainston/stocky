@@ -3,7 +3,7 @@
 
 import { countGaps, createPriceChart } from './candles.js';
 import { createEquityChart, fillMarkers, summarize } from './equity.js';
-import { createPaperChart, paperSummarize } from './paper.js';
+import { createPaperChart, paperCardData, paperSummarize } from './paper.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -43,14 +43,40 @@ function renderStatus(status) {
   el('stat-last').className = ageMs > 15_000 ? 'bad' : '';
 }
 
+const formatPrice = (value) =>
+  Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 async function statusLoop() {
   try {
     renderStatus(await fetchJson('/api/status'));
+    const { ticker } = await fetchJson('/api/ticker');
+    el('stat-prices').textContent = ticker
+      .map((entry) => `${entry.symbol.replace('-USD', '')} ${formatPrice(entry.price)}`)
+      .join('   ');
   } catch {
     el('status-dot').className = 'dot bad';
     el('status-text').textContent = 'collector unreachable';
   }
   setTimeout(statusLoop, 5_000);
+}
+
+async function tapeLoop() {
+  try {
+    const { trades } = await fetchJson(
+      `/api/trades?symbol=${encodeURIComponent(state.symbol)}&limit=30`,
+    );
+    el('trade-tape').innerHTML = trades
+      .map(
+        (trade) =>
+          `<div class="tape-row"><span>${trade.time.slice(11, 19)}</span>` +
+          `<span class="price ${trade.side === 'BUY' ? 'buy' : 'sell'}">${formatPrice(trade.price)}</span>` +
+          `<span class="size">${Number(trade.size).toFixed(5)}</span></div>`,
+      )
+      .join('');
+  } catch {
+    /* tape is decoration; the next tick retries */
+  }
+  setTimeout(tapeLoop, 5_000);
 }
 
 const priceChart = createPriceChart(el('price-chart'));
@@ -160,9 +186,46 @@ async function refreshPaperList() {
   }
 }
 
+function renderPaperDetails(state) {
+  const card = paperCardData(state);
+  const gainLoss = (value) => (value >= 0 ? 'gain' : 'loss');
+  el('card-equity').textContent = formatPrice(card.equity);
+  const returnEl = el('card-return');
+  returnEl.textContent = `${card.returnPct >= 0 ? '+' : ''}${card.returnPct.toFixed(2)}%`;
+  returnEl.className = `pnl-return ${gainLoss(card.returnPct)}`;
+  const deltaEl = el('card-delta');
+  deltaEl.textContent = `${card.deltaPoints >= 0 ? '+' : ''}${card.deltaPoints.toFixed(2)} pts`;
+  deltaEl.className = gainLoss(card.deltaPoints);
+  el('paper-card').classList.remove('hidden');
+
+  const fills = state.main.fills.slice(-15).reverse();
+  const table = el('paper-fills');
+  if (fills.length === 0) {
+    table.classList.add('hidden');
+  } else {
+    table.querySelector('tbody').innerHTML = fills
+      .map(
+        (fill) =>
+          `<tr><td>${fill.executedAtBar.slice(5, 16).replace('T', ' ')}</td>` +
+          `<td class="${fill.side === 'BUY' ? 'gain' : 'loss'}">${fill.side}</td>` +
+          `<td>${formatPrice(fill.fillPrice)}</td>` +
+          `<td>${Number(fill.quantity).toFixed(6)}</td>` +
+          `<td>${Number(fill.fee).toFixed(2)}</td></tr>`,
+      )
+      .join('');
+    table.classList.remove('hidden');
+  }
+}
+
+function hidePaperDetails() {
+  el('paper-card').classList.add('hidden');
+  el('paper-fills').classList.add('hidden');
+}
+
 async function loadPaperSession(id, { fitSymbol = true } = {}) {
   selectedPaper = await fetchJson(`/api/paper/${id}`);
   el('paper-summary').textContent = paperSummarize(selectedPaper);
+  renderPaperDetails(selectedPaper);
   paperChart.setCurves(selectedPaper.main.equityCurve, selectedPaper.baseline.equityCurve);
   if (fitSymbol && selectedPaper.config.symbol !== state.symbol) {
     el('symbol-select').value = selectedPaper.config.symbol;
@@ -179,6 +242,7 @@ el('paper-select').addEventListener('change', async (event) => {
     selectedPaper = null;
     paperChart.clear();
     el('paper-summary').textContent = '';
+    hidePaperDetails();
     applyMarkers();
     return;
   }
@@ -214,6 +278,7 @@ el('backtest-select').addEventListener('change', async (event) => {
     el('paper-select').value = '';
     paperChart.clear();
     el('paper-summary').textContent = '';
+    hidePaperDetails();
     selectedBacktest = await fetchJson(`/api/backtests/${id}`);
     const result = selectedBacktest.result;
     el('backtest-summary').textContent = summarize(result);
@@ -233,6 +298,7 @@ el('backtest-select').addEventListener('change', async (event) => {
 el('symbol-select').addEventListener('change', applyBacktestMarkers);
 
 statusLoop();
+tapeLoop();
 loadBars({ fit: true });
 scheduleBars();
 refreshBacktestList();

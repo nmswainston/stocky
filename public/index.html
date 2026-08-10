@@ -18,6 +18,7 @@
       <span class="stat">trades <b id="stat-trades">-</b></span>
       <span class="stat">bars <b id="stat-bars">-</b></span>
       <span class="stat">last msg <b id="stat-last">-</b></span>
+      <span class="stat prices" id="stat-prices"></span>
     </div>
   </header>
   <main>
@@ -39,7 +40,10 @@
           <span id="bar-info" class="muted"></span>
         </div>
       </div>
-      <div id="price-chart" class="chart"></div>
+      <div class="price-row">
+        <div id="price-chart" class="chart"></div>
+        <div class="tape" id="trade-tape"></div>
+      </div>
     </section>
     <section class="panel">
       <div class="panel-head">
@@ -50,8 +54,19 @@
           </select>
         </div>
       </div>
+      <div class="pnl-card hidden" id="paper-card">
+        <div class="pnl-equity" id="card-equity">-</div>
+        <div class="pnl-return" id="card-return">-</div>
+        <div class="pnl-delta">vs buy &amp; hold <b id="card-delta">-</b></div>
+      </div>
       <div id="paper-summary" class="muted"></div>
       <div id="paper-chart" class="chart chart-short"></div>
+      <table class="fills hidden" id="paper-fills">
+        <thead>
+          <tr><th>executed</th><th>side</th><th>price</th><th>quantity</th><th>fee</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
     </section>
     <section class="panel">
       <div class="panel-head">

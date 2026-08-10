@@ -182,6 +182,8 @@ const statusServer = startServer(
       };
     },
     readBars: (symbol, from, to, limit) => storage.readBars(symbol, from, to, limit),
+    readTicker: () => storage.readTicker(),
+    readRecentTrades: (symbol, limit) => storage.readRecentTrades(symbol, limit),
     publicDirectory: path.resolve('public'),
     backtestsDirectory: path.resolve('data', 'backtests'),
     paperDirectory: path.resolve('data', 'paper'),

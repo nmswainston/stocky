@@ -13,7 +13,9 @@ import { RecentIds } from './dedupe.js';
 import { checkSequence } from './gap-detector.js';
 import { logger } from './logger.js';
 import { parseMessage } from './parse.js';
-import { startStatusServer } from './status-server.js';
+import path from 'node:path';
+import { createRequestHandler } from './api/routes.js';
+import { startServer } from './api/server.js';
 import { Storage } from './storage.js';
 import { TradeBuffer } from './trade-buffer.js';
 
@@ -161,22 +163,37 @@ feed.on('down', (reason) => {
 });
 
 const startedAtMs = Date.now();
-const statusServer = startStatusServer(() => {
-  const connection = feed.stats();
-  return {
-    uptimeSeconds: Math.round((Date.now() - startedAtMs) / 1000),
-    connected: connection.connected,
-    messagesReceived: connection.messagesReceived,
-    lastMessageAt: connection.lastMessageAt,
-    reconnectCount: connection.reconnectCount,
-    gapCount,
-    duplicatesSkipped,
-    lateTrades,
-    buffered: buffer.stats().buffered,
-    tradesWritten: buffer.stats().totalFlushed,
-    barsWritten,
-  };
-});
+const statusServer = startServer(
+  createRequestHandler({
+    snapshot: () => {
+      const connection = feed.stats();
+      return {
+        uptimeSeconds: Math.round((Date.now() - startedAtMs) / 1000),
+        connected: connection.connected,
+        messagesReceived: connection.messagesReceived,
+        lastMessageAt: connection.lastMessageAt,
+        reconnectCount: connection.reconnectCount,
+        gapCount,
+        duplicatesSkipped,
+        lateTrades,
+        buffered: buffer.stats().buffered,
+        tradesWritten: buffer.stats().totalFlushed,
+        barsWritten,
+      };
+    },
+    readBars: (symbol, from, to, limit) => storage.readBars(symbol, from, to, limit),
+    publicDirectory: path.resolve('public'),
+    backtestsDirectory: path.resolve('data', 'backtests'),
+    vendorFiles: {
+      '/vendor/lightweight-charts.js': path.resolve(
+        'node_modules',
+        'lightweight-charts',
+        'dist',
+        'lightweight-charts.standalone.production.js',
+      ),
+    },
+  }),
+);
 
 buffer.start();
 feed.start();

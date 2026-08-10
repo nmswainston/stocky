@@ -139,6 +139,62 @@ export class Storage {
     }));
   }
 
+  // Read-only window of finalized bars for the API. The in-progress
+  // minute lives only in the aggregator's memory, so the dashboard shows
+  // exactly what a strategy would be allowed to see: closed bars.
+  async readBars(
+    symbol: string,
+    from?: string,
+    to?: string,
+    limit = 2_000,
+  ): Promise<
+    Array<{
+      symbol: string;
+      bucketStart: string;
+      open: string;
+      high: string;
+      low: string;
+      close: string;
+      volume: string;
+      tradeCount: number;
+    }>
+  > {
+    const bounded = Math.min(Math.max(1, Math.floor(limit)), 10_000);
+    // Newest rows win when the limit bites, then flip back to ascending.
+    const result = await this.connection.runAndReadAll(
+      `
+      SELECT * FROM (
+        SELECT
+          symbol,
+          strftime(bucket_start, '%Y-%m-%dT%H:%M:%S.%f') || 'Z' AS bucket_start,
+          CAST(open AS VARCHAR) AS open,
+          CAST(high AS VARCHAR) AS high,
+          CAST(low AS VARCHAR) AS low,
+          CAST(close AS VARCHAR) AS close,
+          CAST(volume AS VARCHAR) AS volume,
+          trade_count
+        FROM bars_1m
+        WHERE symbol = ?
+          AND bucket_start >= COALESCE(CAST(? AS TIMESTAMP), TIMESTAMP '1970-01-01')
+          AND bucket_start <= COALESCE(CAST(? AS TIMESTAMP), TIMESTAMP '9999-12-31')
+        ORDER BY bucket_start DESC
+        LIMIT ${bounded}
+      ) ORDER BY bucket_start ASC
+      `,
+      [symbol, from ?? null, to ?? null],
+    );
+    return result.getRowObjects().map((row) => ({
+      symbol: String(row.symbol),
+      bucketStart: String(row.bucket_start),
+      open: String(row.open),
+      high: String(row.high),
+      low: String(row.low),
+      close: String(row.close),
+      volume: String(row.volume),
+      tradeCount: Number(row.trade_count),
+    }));
+  }
+
   // Exports every UTC day older than the given date to partitioned Parquet,
   // then removes those rows from the table. Files land under
   // data/parquet/trades/date=YYYY-MM-DD/symbol=BTC-USD/.

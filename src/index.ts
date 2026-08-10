@@ -184,6 +184,7 @@ const statusServer = startServer(
     readBars: (symbol, from, to, limit) => storage.readBars(symbol, from, to, limit),
     publicDirectory: path.resolve('public'),
     backtestsDirectory: path.resolve('data', 'backtests'),
+    paperDirectory: path.resolve('data', 'paper'),
     vendorFiles: {
       '/vendor/lightweight-charts.js': path.resolve(
         'node_modules',

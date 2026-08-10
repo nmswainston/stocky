@@ -1,12 +1,32 @@
 import { CoinbaseWebSocket } from './coinbase-ws.js';
+import { RecentIds } from './dedupe.js';
 import { checkSequence } from './gap-detector.js';
 import { logger } from './logger.js';
 import { parseMessage } from './parse.js';
+import { Storage } from './storage.js';
+import { TradeBuffer } from './trade-buffer.js';
 
+const storage = await Storage.open();
+const buffer = new TradeBuffer((trades) => storage.insertTrades(trades));
+const recentIds = new RecentIds(20_000);
 const feed = new CoinbaseWebSocket();
 
 let previousSequence: number | null = null;
 let gapCount = 0;
+let duplicatesSkipped = 0;
+
+function todayUtc(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// Export any leftover completed days from previous runs, then re-check
+// hourly so the day rollover is picked up without a restart.
+await storage.exportDaysBefore(todayUtc());
+const exportTimer = setInterval(() => {
+  storage.exportDaysBefore(todayUtc()).catch((error) => {
+    logger.error({ err: error }, 'parquet export failed');
+  });
+}, 60 * 60 * 1000);
 
 feed.on('open', () => {
   // A new connection starts a new sequence stream.
@@ -41,28 +61,46 @@ feed.on('message', (payload) => {
     );
   }
 
-  if (message.kind === 'trades') {
-    logger.debug(
-      { count: message.trades.length, eventType: message.eventType, skipped: message.skipped },
-      'trades',
-    );
-    if (message.skipped > 0) {
-      logger.warn({ skipped: message.skipped }, 'malformed trades skipped');
-    }
+  if (message.kind !== 'trades') return;
+  if (message.skipped > 0) {
+    logger.warn({ skipped: message.skipped }, 'malformed trades skipped');
   }
+
+  const freshTrades = message.trades.filter((trade) => {
+    const isDuplicate = recentIds.seen(`${trade.symbol}:${trade.tradeId}`);
+    if (isDuplicate) duplicatesSkipped += 1;
+    return !isDuplicate;
+  });
+  if (freshTrades.length === 0) return;
+
+  buffer.add(freshTrades);
 });
 
 feed.on('down', (reason) => {
   logger.warn({ reason }, 'feed down');
 });
 
+buffer.start();
 feed.start();
 
-function shutdown(signal: string): void {
-  logger.info({ signal }, 'shutting down');
+let shuttingDown = false;
+async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ signal, duplicatesSkipped, gapCount }, 'shutting down');
   feed.stop();
-  process.exit(0);
+  clearInterval(exportTimer);
+  try {
+    await buffer.stop();
+    await storage.exportDaysBefore(todayUtc());
+    await storage.close();
+    logger.info('shutdown complete');
+    process.exit(0);
+  } catch (error) {
+    logger.error({ err: error }, 'shutdown flush failed');
+    process.exit(1);
+  }
 }
 
-process.on('SIGINT', () => shutdown('SIGINT'));
-process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => void shutdown('SIGINT'));
+process.on('SIGTERM', () => void shutdown('SIGTERM'));

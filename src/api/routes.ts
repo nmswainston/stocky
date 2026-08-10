@@ -33,6 +33,7 @@ export interface ApiDependencies {
   ) => Promise<unknown[]>;
   publicDirectory: string;
   backtestsDirectory: string;
+  paperDirectory: string;
   vendorFiles: Record<string, string>;
 }
 
@@ -92,6 +93,36 @@ async function listBacktests(directory: string): Promise<unknown[]> {
   return summaries;
 }
 
+async function listPaperSessions(directory: string): Promise<unknown[]> {
+  let names: string[];
+  try {
+    names = await readdir(directory);
+  } catch {
+    return [];
+  }
+  const sessions: unknown[] = [];
+  for (const name of names.filter((n) => n.endsWith('.json')).sort()) {
+    try {
+      const parsed = JSON.parse(await readFile(path.join(directory, name), 'utf8'));
+      const curve = parsed.main?.equityCurve ?? [];
+      sessions.push({
+        id: parsed.config?.id ?? name.slice(0, -'.json'.length),
+        strategyName: parsed.config?.strategyName ?? 'unknown',
+        symbol: parsed.config?.symbol ?? 'unknown',
+        initialEquity: parsed.config?.initialEquity ?? null,
+        equity: curve.length > 0 ? curve[curve.length - 1].equity : parsed.config?.initialEquity,
+        lastProcessedBar: parsed.lastProcessedBar ?? null,
+        updatedAt: parsed.updatedAt ?? null,
+        fillCount: parsed.main?.fills?.length ?? 0,
+        gapCount: parsed.gaps?.length ?? 0,
+      });
+    } catch (error) {
+      log.warn({ err: error, name }, 'unreadable paper session skipped');
+    }
+  }
+  return sessions;
+}
+
 export function createRequestHandler(deps: ApiDependencies): http.RequestListener {
   return (request, response) => {
     void (async () => {
@@ -119,6 +150,20 @@ export function createRequestHandler(deps: ApiDependencies): http.RequestListene
 
       if (route === '/api/backtests') {
         sendJson(response, 200, { backtests: await listBacktests(deps.backtestsDirectory) });
+        return;
+      }
+
+      if (route === '/api/paper') {
+        sendJson(response, 200, { sessions: await listPaperSessions(deps.paperDirectory) });
+        return;
+      }
+
+      const paperMatch = /^\/api\/paper\/([A-Za-z0-9._-]+)$/.exec(route);
+      if (paperMatch) {
+        const filePath = path.join(deps.paperDirectory, `${paperMatch[1]}.json`);
+        if (!(await sendFile(response, filePath))) {
+          sendJson(response, 404, { error: 'paper session not found' });
+        }
         return;
       }
 

@@ -7,6 +7,9 @@ const FACTOR = 10n ** BigInt(SCALE_DIGITS);
 
 const DECIMAL_PATTERN = /^(-?)(\d+)(?:\.(\d+))?$/;
 
+// The unit representation of 1.0, for callers doing ratio math on units.
+export const ONE = FACTOR;
+
 export function toUnits(decimalString: string): bigint {
   const match = DECIMAL_PATTERN.exec(decimalString);
   if (!match) throw new Error(`not a decimal string: ${decimalString}`);

@@ -128,8 +128,26 @@ feed.on('message', (payload) => {
 
   buffer.add(freshTrades);
 
+  // Snapshot events list recent trades newest first (verified against the
+  // live feed). Sort them oldest first so open and close come out right,
+  // and drop trades from minutes that already ended: the snapshot window
+  // is only ~100 trades, so those minutes cannot be aggregated completely.
+  // The raw trades are still stored above. The first bar after a cold
+  // start is best effort for the same reason: we may join mid-minute.
+  let tradesForBars = freshTrades;
+  if (message.eventType === 'snapshot') {
+    const currentBucketMs = Math.floor(Date.now() / config.bars.bucketMs) * config.bars.bucketMs;
+    tradesForBars = freshTrades
+      .filter((trade) => bucketStartMsOf(trade.exchangeTime, config.bars.bucketMs) >= currentBucketMs)
+      .sort((a, b) => Date.parse(a.exchangeTime) - Date.parse(b.exchangeTime));
+    logger.info(
+      { snapshotTrades: freshTrades.length, usedForBars: tradesForBars.length },
+      'snapshot processed',
+    );
+  }
+
   const finalized: Bar[] = [];
-  for (const trade of freshTrades) {
+  for (const trade of tradesForBars) {
     const result = applyTrade(barState, trade, config.bars.bucketMs);
     barState = result.state;
     finalized.push(...result.finalized);

@@ -31,6 +31,8 @@ export interface ApiDependencies {
     to?: string,
     limit?: number,
   ) => Promise<unknown[]>;
+  readTicker: () => Promise<unknown[]>;
+  readRecentTrades: (symbol: string, limit?: number) => Promise<unknown[]>;
   publicDirectory: string;
   backtestsDirectory: string;
   paperDirectory: string;
@@ -150,6 +152,18 @@ export function createRequestHandler(deps: ApiDependencies): http.RequestListene
 
       if (route === '/api/backtests') {
         sendJson(response, 200, { backtests: await listBacktests(deps.backtestsDirectory) });
+        return;
+      }
+
+      if (route === '/api/ticker') {
+        sendJson(response, 200, { ticker: await deps.readTicker() });
+        return;
+      }
+
+      if (route === '/api/trades') {
+        const symbol = url.searchParams.get('symbol') ?? 'BTC-USD';
+        const limit = Number(url.searchParams.get('limit') ?? '30');
+        sendJson(response, 200, { symbol, trades: await deps.readRecentTrades(symbol, limit) });
         return;
       }
 

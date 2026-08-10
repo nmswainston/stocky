@@ -195,6 +195,58 @@ export class Storage {
     }));
   }
 
+  // Latest trade per symbol, for the dashboard's price readout. The
+  // trades table holds the current UTC day, which is exactly the
+  // liveness window this exists to show.
+  async readTicker(): Promise<Array<{ symbol: string; price: string; side: string; time: string }>> {
+    const result = await this.connection.runAndReadAll(`
+      SELECT
+        symbol,
+        CAST(arg_max(price, exchange_time) AS VARCHAR) AS price,
+        arg_max(side, exchange_time) AS side,
+        strftime(max(exchange_time), '%Y-%m-%dT%H:%M:%S.%f') || 'Z' AS time
+      FROM trades
+      GROUP BY symbol
+      ORDER BY symbol
+    `);
+    return result.getRowObjects().map((row) => ({
+      symbol: String(row.symbol),
+      price: String(row.price),
+      side: String(row.side),
+      time: String(row.time),
+    }));
+  }
+
+  // Newest trades first, for the dashboard tape.
+  async readRecentTrades(
+    symbol: string,
+    limit = 30,
+  ): Promise<Array<{ tradeId: string; price: string; size: string; side: string; time: string }>> {
+    const bounded = Math.min(Math.max(1, Math.floor(limit)), 200);
+    const result = await this.connection.runAndReadAll(
+      `
+      SELECT
+        trade_id,
+        CAST(price AS VARCHAR) AS price,
+        CAST(size AS VARCHAR) AS size,
+        side,
+        strftime(exchange_time, '%Y-%m-%dT%H:%M:%S.%f') || 'Z' AS time
+      FROM trades
+      WHERE symbol = ?
+      ORDER BY exchange_time DESC
+      LIMIT ${bounded}
+      `,
+      [symbol],
+    );
+    return result.getRowObjects().map((row) => ({
+      tradeId: String(row.trade_id),
+      price: String(row.price),
+      size: String(row.size),
+      side: String(row.side),
+      time: String(row.time),
+    }));
+  }
+
   // Exports every UTC day older than the given date to partitioned Parquet,
   // then removes those rows from the table. Files land under
   // data/parquet/trades/date=YYYY-MM-DD/symbol=BTC-USD/.

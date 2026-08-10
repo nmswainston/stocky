@@ -32,12 +32,15 @@ const money = (value: string): string => Number(value).toFixed(2);
 
 export function renderReport(result: BacktestResult): string {
   const { data, performance, trades, costs, config } = result;
-  const spanMs = Date.parse(data.lastBar) - Date.parse(data.firstBar) + 60_000;
+  const barMs = (config.timeframeMinutes ?? 1) * 60_000;
+  const spanMs = Date.parse(data.lastBar) - Date.parse(data.firstBar) + barMs;
   const spanHours = spanMs / 3_600_000;
   const lines: string[] = [];
 
   lines.push('');
-  lines.push(`Backtest  ${result.strategyName}  ${config.symbol}`);
+  lines.push(
+    `Backtest  ${result.strategyName}  ${config.symbol}  ${config.timeframeMinutes ?? 1}m bars`,
+  );
   lines.push(
     `Data      ${data.firstBar} .. ${data.lastBar}  (${data.barCount} bars, ${data.missingBars} missing, ${data.warmupBarsExcluded} warmup)`,
   );

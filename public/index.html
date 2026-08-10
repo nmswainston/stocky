@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>stocky</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>stocky</h1>
+    <div class="status-strip">
+      <span class="dot" id="status-dot"></span>
+      <span id="status-text">connecting</span>
+      <span class="stat">msgs/s <b id="stat-rate">-</b></span>
+      <span class="stat">gaps <b id="stat-gaps">-</b></span>
+      <span class="stat">reconnects <b id="stat-reconnects">-</b></span>
+      <span class="stat">trades <b id="stat-trades">-</b></span>
+      <span class="stat">bars <b id="stat-bars">-</b></span>
+      <span class="stat">last msg <b id="stat-last">-</b></span>
+    </div>
+  </header>
+  <main>
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Price</h2>
+        <div class="controls">
+          <select id="symbol-select">
+            <option>BTC-USD</option>
+            <option>ETH-USD</option>
+          </select>
+          <select id="range-select">
+            <option value="180">3h</option>
+            <option value="720">12h</option>
+            <option value="1440" selected>24h</option>
+            <option value="4320">3d</option>
+            <option value="10000">max</option>
+          </select>
+          <span id="bar-info" class="muted"></span>
+        </div>
+      </div>
+      <div id="price-chart" class="chart"></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Backtests</h2>
+        <div class="controls">
+          <select id="backtest-select">
+            <option value="">none saved yet</option>
+          </select>
+        </div>
+      </div>
+      <div id="backtest-summary" class="muted"></div>
+      <div id="equity-chart" class="chart chart-short"></div>
+    </section>
+  </main>
+  <script src="/vendor/lightweight-charts.js"></script>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

@@ -3,6 +3,7 @@
 
 import { countGaps, createPriceChart } from './candles.js';
 import { createEquityChart, fillMarkers, summarize } from './equity.js';
+import { createPaperChart, paperSummarize } from './paper.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -117,13 +118,87 @@ async function refreshBacktestList() {
   }
 }
 
-function applyBacktestMarkers() {
-  if (selectedBacktest && selectedBacktest.result.config.symbol === state.symbol) {
+const paperChart = createPaperChart(el('paper-chart'));
+let selectedPaper = null;
+
+// One marker owner at a time: whichever of paper or backtest was
+// selected last draws its fills on the price chart.
+function applyMarkers() {
+  if (selectedPaper && selectedPaper.config.symbol === state.symbol) {
+    priceChart.setMarkers(fillMarkers({ fills: selectedPaper.main.fills }));
+  } else if (selectedBacktest && selectedBacktest.result.config.symbol === state.symbol) {
     priceChart.setMarkers(fillMarkers(selectedBacktest.result));
   } else {
     priceChart.setMarkers([]);
   }
 }
+const applyBacktestMarkers = applyMarkers;
+
+async function refreshPaperList() {
+  try {
+    const { sessions } = await fetchJson('/api/paper');
+    const select = el('paper-select');
+    const current = select.value;
+    select.innerHTML = '';
+    if (sessions.length === 0) {
+      select.append(new Option('no sessions yet', ''));
+      return;
+    }
+    select.append(new Option('select a session', ''));
+    for (const session of sessions) {
+      const initial = Number(session.initialEquity);
+      const pct = initial > 0
+        ? ` ${(((Number(session.equity) - initial) / initial) * 100).toFixed(2)}%`
+        : '';
+      select.append(new Option(`${session.strategyName} ${session.symbol}${pct}`, session.id));
+    }
+    if ([...select.options].some((option) => option.value === current)) {
+      select.value = current;
+    }
+  } catch {
+    /* best effort, retried on the next tick */
+  }
+}
+
+async function loadPaperSession(id, { fitSymbol = true } = {}) {
+  selectedPaper = await fetchJson(`/api/paper/${id}`);
+  el('paper-summary').textContent = paperSummarize(selectedPaper);
+  paperChart.setCurves(selectedPaper.main.equityCurve, selectedPaper.baseline.equityCurve);
+  if (fitSymbol && selectedPaper.config.symbol !== state.symbol) {
+    el('symbol-select').value = selectedPaper.config.symbol;
+    state.symbol = selectedPaper.config.symbol;
+    await loadBars({ fit: true });
+    scheduleBars();
+  }
+  applyMarkers();
+}
+
+el('paper-select').addEventListener('change', async (event) => {
+  const id = event.target.value;
+  if (!id) {
+    selectedPaper = null;
+    paperChart.clear();
+    el('paper-summary').textContent = '';
+    applyMarkers();
+    return;
+  }
+  try {
+    selectedBacktest = null;
+    el('backtest-select').value = '';
+    equityChart.clear();
+    el('backtest-summary').textContent = '';
+    await loadPaperSession(id);
+  } catch (error) {
+    el('paper-summary').textContent = `could not load session: ${error.message}`;
+  }
+});
+
+// A live session keeps moving; refresh the selected one each minute.
+setInterval(() => {
+  if (selectedPaper) {
+    loadPaperSession(selectedPaper.config.id, { fitSymbol: false }).catch(() => {});
+  }
+}, 60_000);
 
 el('backtest-select').addEventListener('change', async (event) => {
   const id = event.target.value;
@@ -135,6 +210,10 @@ el('backtest-select').addEventListener('change', async (event) => {
     return;
   }
   try {
+    selectedPaper = null;
+    el('paper-select').value = '';
+    paperChart.clear();
+    el('paper-summary').textContent = '';
     selectedBacktest = await fetchJson(`/api/backtests/${id}`);
     const result = selectedBacktest.result;
     el('backtest-summary').textContent = summarize(result);
@@ -158,3 +237,5 @@ loadBars({ fit: true });
 scheduleBars();
 refreshBacktestList();
 setInterval(refreshBacktestList, 30_000);
+refreshPaperList();
+setInterval(refreshPaperList, 30_000);

@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "backtest": "tsx src/backtest/cli.ts",
+    "paper": "tsx src/paper/cli.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",

@@ -1,3 +1,4 @@
+import { numberArg as sharedNumberArg, parseArgs } from '../cli-args.js';
 import { basisPointCosts } from './costs.js';
 import { runReplay } from './engine.js';
 import { loadBarsHttp } from './load-bars-http.js';
@@ -5,38 +6,12 @@ import { loadBars } from './load-bars.js';
 import { assembleResult } from './metrics.js';
 import { renderReport } from './report.js';
 import { saveResult } from './save-result.js';
-import { buyAndHold } from './strategies/buy-and-hold.js';
-import { smaCrossover } from './strategies/sma-crossover.js';
+import { buildStrategy } from './strategy-factory.js';
 import type { BacktestConfig, ClosedBar, Strategy } from './types.js';
 
-// Plain argv parsing. A flags library would be dependency number nine
-// for the sake of one loop.
-
-function parseArgs(argv: string[]): Map<string, string> {
-  const args = new Map<string, string>();
-  for (let i = 0; i < argv.length; i += 1) {
-    const token = argv[i] as string;
-    if (!token.startsWith('--')) continue;
-    const next = argv[i + 1];
-    if (next !== undefined && !next.startsWith('--')) {
-      args.set(token.slice(2), next);
-      i += 1;
-    } else {
-      args.set(token.slice(2), 'true');
-    }
-  }
-  return args;
-}
-
 const args = parseArgs(process.argv.slice(2));
-
-const numberArg = (name: string, fallback: number): number => {
-  const raw = args.get(name);
-  if (raw === undefined) return fallback;
-  const value = Number(raw);
-  if (Number.isNaN(value)) throw new Error(`--${name} expects a number, got ${raw}`);
-  return value;
-};
+const numberArg = (name: string, fallback: number): number =>
+  sharedNumberArg(args, name, fallback);
 
 const config: BacktestConfig = {
   symbol: args.get('symbol') ?? 'BTC-USD',
@@ -53,9 +28,9 @@ function chooseStrategy(): Strategy<unknown> {
   const name = args.get('strategy') ?? 'buyhold';
   switch (name) {
     case 'buyhold':
-      return buyAndHold as Strategy<unknown>;
+      return buildStrategy({ kind: 'buyhold' });
     case 'sma':
-      return smaCrossover(numberArg('fast', 20), numberArg('slow', 50)) as Strategy<unknown>;
+      return buildStrategy({ kind: 'sma', fast: numberArg('fast', 20), slow: numberArg('slow', 50) });
     default:
       throw new Error(`unknown strategy ${name}, expected buyhold or sma`);
   }

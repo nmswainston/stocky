@@ -118,9 +118,12 @@ export function runReplay<State>(
         if (quantityUnits > 0n) {
           cashUnits -= notionalUnits + feeUnits;
           positionUnits += quantityUnits;
-          grossCashUnits -= mulUnitsUp(quantityUnits, openUnits);
+          const grossNotionalUnits = mulUnitsUp(quantityUnits, openUnits);
+          grossCashUnits -= grossNotionalUnits;
           totalFeesUnits += feeUnits;
-          totalSlippageUnits += mulUnitsUp(quantityUnits, fillPriceUnits - openUnits);
+          // Slippage as the exact difference between what was paid and the
+          // frictionless notional, so friction always sums exactly.
+          totalSlippageUnits += notionalUnits - grossNotionalUnits;
           const fill: Fill = {
             side: 'BUY',
             executedAtBar: bar.bucketStart,
@@ -141,9 +144,10 @@ export function runReplay<State>(
         const feeUnits = costs.fee(notionalUnits);
         cashUnits += notionalUnits - feeUnits;
         positionUnits = 0n;
-        grossCashUnits += mulUnitsDown(quantityUnits, openUnits);
+        const grossNotionalUnits = mulUnitsDown(quantityUnits, openUnits);
+        grossCashUnits += grossNotionalUnits;
         totalFeesUnits += feeUnits;
-        totalSlippageUnits += mulUnitsDown(quantityUnits, openUnits - fillPriceUnits);
+        totalSlippageUnits += grossNotionalUnits - notionalUnits;
         const fill: Fill = {
           side: 'SELL',
           executedAtBar: bar.bucketStart,
@@ -178,14 +182,25 @@ export function runReplay<State>(
 
     // 3. decide
     const window = createBarWindow(bars, index + 1);
-    const decision = strategy.decide(window, state);
+    let decision;
     if (options.verifyDecisions) {
-      const replay = strategy.decide(window, state === null ? null : structuredClone(state));
+      // Clone before the first call so both mutation of prior state and
+      // nondeterminism (clock, randomness, hidden counters) are caught.
+      const pristine = state === null ? null : structuredClone(state);
+      decision = strategy.decide(window, state);
+      if (JSON.stringify(state) !== JSON.stringify(pristine)) {
+        throw new Error(
+          `strategy ${strategy.name} mutated its prior state at bar ${bar.bucketStart}`,
+        );
+      }
+      const replay = strategy.decide(window, pristine);
       if (JSON.stringify(replay) !== JSON.stringify(decision)) {
         throw new Error(
           `strategy ${strategy.name} is not deterministic: repeated decision at bar ${bar.bucketStart} differed`,
         );
       }
+    } else {
+      decision = strategy.decide(window, state);
     }
     state = decision.state;
     const warm = index + 1 >= strategy.warmupBars;

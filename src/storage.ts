@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { DuckDBConnection, DuckDBInstance } from '@duckdb/node-api';
+import type { Bar } from './bar-aggregator.js';
 import { config } from './config.js';
 import { logger } from './logger.js';
 import type { Trade } from './parse.js';
@@ -42,6 +43,19 @@ export class Storage {
         sequence_num BIGINT NOT NULL
       )
     `);
+    await this.connection.run(`
+      CREATE TABLE IF NOT EXISTS bars_1m (
+        symbol VARCHAR NOT NULL,
+        bucket_start TIMESTAMP NOT NULL,
+        open DECIMAL(18, 8) NOT NULL,
+        high DECIMAL(18, 8) NOT NULL,
+        low DECIMAL(18, 8) NOT NULL,
+        close DECIMAL(18, 8) NOT NULL,
+        volume DECIMAL(18, 8) NOT NULL,
+        trade_count INTEGER NOT NULL,
+        PRIMARY KEY (symbol, bucket_start)
+      )
+    `);
   }
 
   async insertTrades(trades: Trade[]): Promise<void> {
@@ -66,6 +80,63 @@ export class Storage {
       ]);
       await this.connection.run(sql, values);
     }
+  }
+
+  // Upsert rather than plain insert: the same bucket can be written twice,
+  // once as a partial bar at shutdown and again after a restart rebuilds it
+  // from raw trades. Last write wins and is the more complete one.
+  async upsertBars(bars: Bar[]): Promise<void> {
+    for (const bar of bars) {
+      await this.connection.run(
+        `
+        INSERT INTO bars_1m (symbol, bucket_start, open, high, low, close, volume, trade_count)
+        VALUES (?, CAST(? AS TIMESTAMP),
+          CAST(? AS DECIMAL(18, 8)), CAST(? AS DECIMAL(18, 8)),
+          CAST(? AS DECIMAL(18, 8)), CAST(? AS DECIMAL(18, 8)),
+          CAST(? AS DECIMAL(18, 8)), ?)
+        ON CONFLICT (symbol, bucket_start) DO UPDATE SET
+          open = excluded.open,
+          high = excluded.high,
+          low = excluded.low,
+          close = excluded.close,
+          volume = excluded.volume,
+          trade_count = excluded.trade_count
+        `,
+        [bar.symbol, bar.bucketStart, bar.open, bar.high, bar.low, bar.close, bar.volume, bar.tradeCount],
+      );
+    }
+  }
+
+  // Trades at or after the given instant, oldest first. Used on startup to
+  // rebuild the in-progress bar and to re-seed the duplicate filter.
+  async tradesSince(sinceIso: string): Promise<Trade[]> {
+    const result = await this.connection.runAndReadAll(
+      `
+      SELECT
+        trade_id,
+        symbol,
+        CAST(price AS VARCHAR) AS price,
+        CAST(size AS VARCHAR) AS size,
+        side,
+        strftime(exchange_time, '%Y-%m-%dT%H:%M:%S.%f') || 'Z' AS exchange_time,
+        strftime(received_at, '%Y-%m-%dT%H:%M:%S.%f') || 'Z' AS received_at,
+        sequence_num
+      FROM trades
+      WHERE exchange_time >= CAST(? AS TIMESTAMP)
+      ORDER BY exchange_time
+      `,
+      [sinceIso],
+    );
+    return result.getRowObjects().map((row) => ({
+      tradeId: String(row.trade_id),
+      symbol: String(row.symbol),
+      price: String(row.price),
+      size: String(row.size),
+      side: row.side === 'SELL' ? 'SELL' : 'BUY',
+      exchangeTime: String(row.exchange_time),
+      receivedAt: String(row.received_at),
+      sequenceNum: Number(row.sequence_num),
+    }));
   }
 
   // Exports every UTC day older than the given date to partitioned Parquet,

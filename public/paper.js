@@ -2,6 +2,8 @@
 // baseline on one chart, because "am I beating doing nothing" is the
 // only paper trading question that matters.
 
+import { toChartTime } from './time.js';
+
 const COLORS = {
   strategy: '#58a6ff',
   baseline: '#6e7681',
@@ -34,7 +36,7 @@ export function createPaperChart(container) {
 
   const toPoints = (curve) =>
     curve.map((point) => ({
-      time: Math.floor(Date.parse(point.time) / 1000),
+      time: toChartTime(point.time),
       value: Number(point.equity),
     }));
 

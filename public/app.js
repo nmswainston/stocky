@@ -4,6 +4,7 @@
 import { countGaps, createPriceChart } from './candles.js';
 import { createEquityChart, fillMarkers, summarize } from './equity.js';
 import { createPaperChart, paperCardData, paperSummarize } from './paper.js';
+import { localDateTime, localTime } from './time.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -74,7 +75,7 @@ async function tapeLoop() {
     el('trade-tape').innerHTML = trades
       .map(
         (trade) =>
-          `<div class="tape-row"><span>${trade.time.slice(11, 19)}</span>` +
+          `<div class="tape-row"><span>${localTime(trade.time)}</span>` +
           `<span class="price ${trade.side === 'BUY' ? 'buy' : 'sell'}">${formatPrice(trade.price)}</span>` +
           `<span class="size">${Number(trade.size).toFixed(8).replace(/0+$/, '').replace(/\.$/, '')}</span></div>`,
       )
@@ -212,7 +213,7 @@ function renderPaperDetails(state) {
     table.querySelector('tbody').innerHTML = fills
       .map(
         (fill) =>
-          `<tr><td>${fill.executedAtBar.slice(5, 16).replace('T', ' ')}</td>` +
+          `<tr><td>${localDateTime(fill.executedAtBar)}</td>` +
           `<td class="${fill.side === 'BUY' ? 'gain' : 'loss'}">${fill.side}</td>` +
           `<td>${formatPrice(fill.fillPrice)}</td>` +
           `<td>${Number(fill.quantity).toFixed(6)}</td>` +

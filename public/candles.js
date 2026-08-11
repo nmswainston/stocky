@@ -1,6 +1,8 @@
 // Candlestick and volume rendering. Uses the lightweight-charts v5
 // standalone global. This module never fetches; app.js feeds it.
 
+import { toChartTime } from './time.js';
+
 const COLORS = {
   up: '#2ea043',
   down: '#f85149',
@@ -45,7 +47,7 @@ export function createPriceChart(container) {
     setBars(bars, { fit = false } = {}) {
       candles.setData(
         bars.map((bar) => ({
-          time: Math.floor(Date.parse(bar.bucketStart) / 1000),
+          time: toChartTime(bar.bucketStart),
           open: Number(bar.open),
           high: Number(bar.high),
           low: Number(bar.low),
@@ -54,7 +56,7 @@ export function createPriceChart(container) {
       );
       volume.setData(
         bars.map((bar) => ({
-          time: Math.floor(Date.parse(bar.bucketStart) / 1000),
+          time: toChartTime(bar.bucketStart),
           value: Number(bar.volume),
         })),
       );

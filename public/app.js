@@ -53,6 +53,12 @@ async function statusLoop() {
     el('stat-prices').textContent = ticker
       .map((entry) => `${entry.symbol.replace('-USD', '')} ${formatPrice(entry.price)}`)
       .join('   ');
+    // Tab title carries the selected symbol's price, glanceable from
+    // any other window.
+    const selected = ticker.find((entry) => entry.symbol === state.symbol);
+    if (selected) {
+      document.title = `${state.symbol.replace('-USD', '')} ${formatPrice(selected.price)} · stocky`;
+    }
   } catch {
     el('status-dot').className = 'dot bad';
     el('status-text').textContent = 'collector unreachable';

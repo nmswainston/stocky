@@ -1,6 +1,8 @@
 // Equity curve rendering and trade marker construction for a saved
 // backtest result.
 
+import { localMinute, toChartTime } from './time.js';
+
 const COLORS = {
   above: '#2ea043',
   below: '#f85149',
@@ -38,7 +40,7 @@ export function createEquityChart(container) {
       });
       series.setData(
         result.equityCurve.map((point) => ({
-          time: Math.floor(Date.parse(point.time) / 1000),
+          time: toChartTime(point.time),
           value: Number(point.equity),
         })),
       );
@@ -56,11 +58,11 @@ export function createEquityChart(container) {
 // the one-bar decision-to-fill delay stays visible.
 export function fillMarkers(result) {
   return result.fills.map((fill) => ({
-    time: Math.floor(Date.parse(fill.executedAtBar) / 1000),
+    time: toChartTime(fill.executedAtBar),
     position: fill.side === 'BUY' ? 'belowBar' : 'aboveBar',
     color: fill.side === 'BUY' ? COLORS.above : COLORS.below,
     shape: fill.side === 'BUY' ? 'arrowUp' : 'arrowDown',
-    text: `${fill.side} ${Number(fill.quantity).toFixed(5)} @ ${Number(fill.fillPrice).toFixed(2)} (decided ${fill.decidedAtBar.slice(11, 16)})`,
+    text: `${fill.side} ${Number(fill.quantity).toFixed(5)} @ ${Number(fill.fillPrice).toFixed(2)} (decided ${localMinute(fill.decidedAtBar)})`,
   }));
 }
 

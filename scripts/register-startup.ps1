@@ -7,6 +7,7 @@
 
 param([switch]$Remove)
 
+$ErrorActionPreference = 'Stop'
 $taskName = 'Stocky Supervisor'
 
 if ($Remove) {
@@ -24,14 +25,22 @@ if (-not (Test-Path $tsx)) {
 }
 
 $action = New-ScheduledTaskAction -Execute $node -Argument "`"$tsx`" src/supervisor.ts" -WorkingDirectory $repo
-$trigger = New-ScheduledTaskTrigger -AtLogOn
+# Scoping the trigger to the current user lets this register without
+# elevation; a bare -AtLogOn (any user) requires admin rights.
+$user = "$env:USERDOMAIN\$env:USERNAME"
+$trigger = New-ScheduledTaskTrigger -AtLogOn -User $user
 $settings = New-ScheduledTaskSettingsSet `
     -RestartCount 3 `
     -RestartInterval (New-TimeSpan -Minutes 1) `
     -ExecutionTimeLimit ([TimeSpan]::Zero) `
     -StartWhenAvailable
 
-Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings | Out-Null
+try {
+    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
+} catch {
+    Write-Error "Failed to register scheduled task '$taskName': $($_.Exception.Message)"
+    exit 1
+}
 Write-Host "Registered scheduled task '$taskName': supervisor starts at logon."
 Write-Host "It is not running yet; start it now with: npm run up"
 Write-Host "Or start the task immediately: Start-ScheduledTask -TaskName '$taskName'"

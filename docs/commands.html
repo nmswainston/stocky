@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stocky command legend</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>&#128200;</text></svg>">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0e1116;
+    --panel: #11151c;
+    --border: #21262d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #2ea043;
+    --code-bg: #161b22;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+    padding: 2rem 1.25rem 4rem;
+  }
+  main { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; letter-spacing: 0.06em; margin-bottom: 0.3rem; }
+  h2 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin: 2rem 0 0.6rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.35rem;
+  }
+  p { margin: 0.5rem 0; }
+  .muted { color: var(--muted); font-size: 0.85rem; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.85em;
+    white-space: nowrap;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.7rem 0.9rem;
+    overflow-x: auto;
+    margin: 0.6rem 0;
+  }
+  pre code { background: none; border: none; padding: 0; white-space: pre; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin: 0.6rem 0;
+  }
+  th {
+    text-align: left;
+    color: var(--muted);
+    font-weight: 500;
+    border-bottom: 1px solid var(--border);
+    padding: 0.35rem 0.6rem;
+  }
+  td {
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid var(--code-bg);
+    vertical-align: top;
+  }
+  td:first-child { white-space: nowrap; }
+  .rule {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--green);
+    border-radius: 8px;
+    padding: 0.8rem 1rem;
+    margin-top: 2rem;
+  }
+  li { margin: 0.3rem 0 0.3rem 1.2rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>&#128200; Stocky command legend</h1>
+  <p class="muted">All commands run from a terminal inside the stocky folder
+  (wherever this clone lives on this machine).</p>
+  <p>Dashboard (the app itself, while running): <a href="http://127.0.0.1:8787">http://127.0.0.1:8787</a></p>
+
+  <h2>Daily</h2>
+  <table>
+    <tr><th>Command</th><th>What it does</th><th>When to use it</th></tr>
+    <tr>
+      <td><code>npm run up</code></td>
+      <td>Starts everything: collector + all paper sessions, auto-restarts on crash, logs to <code>data\logs\</code></td>
+      <td>After a reboot, if you have not registered auto-start. Otherwise never; it starts itself</td>
+    </tr>
+  </table>
+
+  <h2>One-time setup</h2>
+  <table>
+    <tr><th>Command</th><th>What it does</th></tr>
+    <tr>
+      <td><code>powershell -ExecutionPolicy Bypass -File scripts\register-startup.ps1</code></td>
+      <td>Makes <code>npm run up</code> start automatically at Windows logon</td>
+    </tr>
+    <tr>
+      <td>same with <code>-Remove</code> at the end</td>
+      <td>Undoes the auto-start</td>
+    </tr>
+  </table>
+
+  <h2>Experimenting</h2>
+  <table>
+    <tr><th>Command</th><th>What it does</th></tr>
+    <tr>
+      <td><code>npm run backtest -- --strategy sma --fast 5 --slow 20 --save</code></td>
+      <td>Tests a strategy against collected history; <code>--save</code> shows it on the dashboard</td>
+    </tr>
+    <tr>
+      <td>add <code>--timeframe 15</code></td>
+      <td>Same, but on 15 minute bars (fewer trades, less fee drag)</td>
+    </tr>
+    <tr>
+      <td>add <code>--strategy buyhold</code></td>
+      <td>The baseline every strategy must beat</td>
+    </tr>
+    <tr>
+      <td><code>npm run paper -- --strategy sma --fast 10 --slow 30</code></td>
+      <td>Starts paper trading a strategy with fictional money. Ctrl+C after it starts; <code>npm run up</code> adopts it forever</td>
+    </tr>
+    <tr>
+      <td><code>npm run reconcile -- --id sma-crossover-5-20-btc-usd</code></td>
+      <td>Proves paper results equal backtest results on the same bars. RECONCILED = healthy</td>
+    </tr>
+  </table>
+
+  <h2>Maintenance and checks</h2>
+  <table>
+    <tr><th>Command</th><th>What it does</th></tr>
+    <tr><td><code>npm test</code></td><td>Runs the 38 test suite</td></tr>
+    <tr><td><code>npm run typecheck</code></td><td>Type checks without building</td></tr>
+    <tr>
+      <td><code>npm run dev</code></td>
+      <td>Collector alone in a terminal, for debugging (do not run while <code>npm run up</code> is running; they fight over port 8787)</td>
+    </tr>
+  </table>
+
+  <h2>Where things live</h2>
+  <table>
+    <tr><th>Path</th><th>Contents</th></tr>
+    <tr><td><code>stocky\data\stocky.duckdb</code></td><td>Today's trades + all 1 minute bars</td></tr>
+    <tr><td><code>stocky\data\parquet\trades\</code></td><td>Completed days, archived</td></tr>
+    <tr><td><code>stocky\data\backtests\</code></td><td>Saved backtest results (JSON)</td></tr>
+    <tr><td><code>stocky\data\paper\</code></td><td>Paper session state (JSON)</td></tr>
+    <tr><td><code>stocky\data\logs\</code></td><td>Supervisor logs when running via <code>npm run up</code></td></tr>
+  </table>
+
+  <h2>Reading the dashboard</h2>
+  <ul>
+    <li>Green dot = healthy. Red = feed down or stalled.</li>
+    <li>Paper panel "vs buy &amp; hold": positive = strategy beating doing nothing. The only score that matters.</li>
+    <li>Gross vs net on any backtest: the gap between them is fees + slippage. If gross is positive and net is negative, the exchange won, not the market.</li>
+    <li>"missing" counts are collector downtime. They are reported, never hidden.</li>
+  </ul>
+
+  <div class="rule">
+    <b>The rule that is not a command:</b> the app cannot place real orders.
+    That is phase 5, and it stays locked until a strategy beats buy and hold
+    in paper trading for weeks.
+  </div>
+</main>
+</body>
+</html>

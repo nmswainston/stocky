@@ -3,7 +3,7 @@
 export const config = {
   coinbase: {
     websocketUrl: 'wss://advanced-trade-ws.coinbase.com',
-    productIds: ['BTC-USD', 'ETH-USD'],
+    productIds: ['BTC-USD', 'ETH-USD', 'SOL-USD'],
     // Heartbeats arrive roughly once per second. If nothing at all arrives
     // for this long, the connection is considered dead and is torn down.
     silenceTimeoutMs: 15_000,

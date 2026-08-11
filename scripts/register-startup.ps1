@@ -24,7 +24,13 @@ if (-not (Test-Path $tsx)) {
     exit 1
 }
 
-$action = New-ScheduledTaskAction -Execute $node -Argument "`"$tsx`" src/supervisor.ts" -WorkingDirectory $repo
+# node runs through the VBS wrapper so no console window appears;
+# closing that window would kill the supervisor.
+$wrapper = Join-Path $PSScriptRoot 'run-hidden.vbs'
+$wscript = Join-Path $env:SystemRoot 'System32\wscript.exe'
+$action = New-ScheduledTaskAction -Execute $wscript `
+    -Argument "`"$wrapper`" `"$node`" `"$tsx`" src/supervisor.ts" `
+    -WorkingDirectory $repo
 # Scoping the trigger to the current user lets this register without
 # elevation; a bare -AtLogOn (any user) requires admin rights.
 $user = "$env:USERDOMAIN\$env:USERNAME"

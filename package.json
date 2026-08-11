@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "tsx src/index.ts",
+    "up": "tsx src/supervisor.ts",
     "backtest": "tsx src/backtest/cli.ts",
     "paper": "tsx src/paper/cli.ts",
     "reconcile": "tsx src/paper/reconcile.ts",

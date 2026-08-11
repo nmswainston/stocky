@@ -42,6 +42,10 @@ the collector runs.
 
 Dashboard: http://127.0.0.1:8787 while the collector runs.
 
+A styled, printable version of this command table lives at
+[docs/commands.html](docs/commands.html); double-click it to open in a
+browser.
+
 ## Always-on operation
 
 `npm run up` starts the collector and a paper runner for every session

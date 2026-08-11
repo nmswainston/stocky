@@ -25,7 +25,10 @@ export const config = {
     finalizeGraceMs: 5_000,
   },
   status: {
-    host: '127.0.0.1',
-    port: 8787,
+    // Loopback by default. On a headless box set STOCKY_HOST=0.0.0.0
+    // to reach the dashboard from other machines on the LAN; the API
+    // is read-only, so exposure is just market data.
+    host: process.env.STOCKY_HOST ?? '127.0.0.1',
+    port: Number(process.env.STOCKY_PORT ?? 8787),
   },
 } as const;

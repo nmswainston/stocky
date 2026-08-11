@@ -1,0 +1,30 @@
+# Systemd unit for the stocky supervisor (Linux / Raspberry Pi).
+#
+# Install, from the repo directory:
+#   sudo cp scripts/stocky.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now stocky
+#
+# Paths below assume the repo at /home/pi/stocky and node from
+# NodeSource at /usr/bin/node; adjust User, WorkingDirectory, and
+# ExecStart if yours differ (find node with: which node).
+#
+# Logs: journalctl -u stocky -f
+
+[Unit]
+Description=stocky supervisor (collector + paper sessions)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/stocky
+ExecStart=/usr/bin/node /home/pi/stocky/node_modules/tsx/dist/cli.mjs src/supervisor.ts
+# Serve the dashboard to the LAN; the API is read-only market data.
+# Delete this line to keep it loopback-only.
+Environment=STOCKY_HOST=0.0.0.0
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -62,6 +62,31 @@ powershell -ExecutionPolicy Bypass -File scripts\register-startup.ps1
 
 Remove it again with the same script plus `-Remove`.
 
+### Linux / Raspberry Pi
+
+A Pi 3 B+ or later handles collection comfortably; use 64-bit
+Raspberry Pi OS **Lite** (Node and DuckDB need ARM64, and the desktop
+would waste the Pi 3's 1 GB of RAM). Prefer a USB SSD or
+high-endurance card for `data/` — continuous writes wear cheap
+microSD cards out.
+
+```
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs git
+git clone https://github.com/nmswainston/stocky.git ~/stocky
+cd ~/stocky && npm ci
+sudo cp scripts/stocky.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now stocky
+```
+
+The unit sets `STOCKY_HOST=0.0.0.0` so the dashboard is reachable at
+`http://<pi-address>:8787` from the LAN (the API is read-only; remove
+that line for loopback-only plus an SSH tunnel). Logs:
+`journalctl -u stocky -f`. On a 1 GB Pi keep it to the collector plus
+a couple of paper sessions, and run backtests from another machine
+against the Pi's API.
+
 ## Data layout
 
 ```

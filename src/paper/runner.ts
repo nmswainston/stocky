@@ -3,6 +3,7 @@ import { loadBarsHttp } from '../backtest/load-bars-http.js';
 import { buildStrategy } from '../backtest/strategy-factory.js';
 import type { ClosedBar } from '../backtest/types.js';
 import { logger } from '../logger.js';
+import { createBarFolder } from './fold.js';
 import { deserializeBook, serializeBook, stepBook, type BookState } from './session.js';
 import { saveStateFile, type PaperStateFile } from './state-file.js';
 
@@ -27,13 +28,21 @@ export async function runPaper(state: PaperStateFile, options: RunnerOptions): P
   const baselineStrategy = buildStrategy({ kind: 'buyhold' });
   const costs = basisPointCosts(config);
   const fractionBps = BigInt(Math.round(config.positionFraction * 10_000));
+  const timeframe = config.timeframeMinutes ?? 1;
+  const bucketMs = timeframe * 60_000;
 
   let main: BookState<unknown> = deserializeBook(state.main);
   let baseline: BookState<unknown> = deserializeBook(state.baseline);
 
-  // Full session history, kept in memory and grown in place. The bar
-  // window mechanism makes stale references safe, same as the engine.
+  // Full session history at the session's timeframe, kept in memory and
+  // grown in place. The bar window mechanism makes stale references
+  // safe, same as the engine.
   const history: ClosedBar[] = [];
+  // Raw 1m bars fold into timeframe bars here; the folder only releases
+  // a bucket once its period is proven over, mirroring the backtester's
+  // aggregation exactly.
+  const folder = createBarFolder(timeframe, state.lastProcessedBar);
+  let lastRawBar: string | null = null;
   let stopping = false;
 
   const persist = async (): Promise<void> => {
@@ -43,13 +52,14 @@ export async function runPaper(state: PaperStateFile, options: RunnerOptions): P
     await saveStateFile(options.directory, state);
   };
 
-  const processNewBars = (bars: ClosedBar[]): number => {
+  const processNewBars = (rawBars: ClosedBar[]): number => {
+    const newest = rawBars[rawBars.length - 1];
+    if (newest) lastRawBar = newest.bucketStart;
     let processed = 0;
-    for (const bar of bars) {
-      if (state.lastProcessedBar && bar.bucketStart <= state.lastProcessedBar) continue;
+    for (const bar of folder.push(rawBars)) {
       if (state.lastProcessedBar) {
         const stepMs = Date.parse(bar.bucketStart) - Date.parse(state.lastProcessedBar);
-        const missedBars = Math.round(stepMs / 60_000) - 1;
+        const missedBars = Math.round(stepMs / bucketMs) - 1;
         if (missedBars > 0) {
           state.gaps.push({ from: state.lastProcessedBar, to: bar.bucketStart, missedBars });
           log.warn({ from: state.lastProcessedBar, to: bar.bucketStart, missedBars }, 'bar gap');
@@ -90,7 +100,9 @@ export async function runPaper(state: PaperStateFile, options: RunnerOptions): P
     await sleep(options.pollMs);
     if (stopping) break;
     try {
-      const since = state.lastProcessedBar ?? config.startedAt;
+      // Poll from the newest raw bar seen, not the newest processed
+      // bucket: a bucket in progress means raw bars are always ahead.
+      const since = lastRawBar ?? config.startedAt;
       const bars = await loadBarsHttp(options.apiBase, config.symbol, since);
       const processed = processNewBars(bars);
       if (processed > 0) await persist();

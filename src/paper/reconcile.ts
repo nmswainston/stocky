@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { parseArgs } from '../cli-args.js';
+import { aggregateBars } from '../backtest/aggregate.js';
 import { basisPointCosts } from '../backtest/costs.js';
 import { runReplay } from '../backtest/engine.js';
 import { loadBarsHttp } from '../backtest/load-bars-http.js';
@@ -34,6 +35,9 @@ if (!state.lastProcessedBar) {
   process.exit(0);
 }
 
+const timeframe = state.config.timeframeMinutes ?? 1;
+const lastProcessedMs = Date.parse(state.lastProcessedBar);
+
 const config: BacktestConfig = {
   symbol: state.config.symbol,
   initialEquity: state.config.initialEquity,
@@ -41,16 +45,31 @@ const config: BacktestConfig = {
   takerFeeBps: state.config.takerFeeBps,
   makerFeeBps: state.config.makerFeeBps,
   slippageBps: state.config.slippageBps,
+  timeframeMinutes: timeframe,
   from: state.config.startedAt,
   to: state.lastProcessedBar,
 };
 
+// For timeframes above 1m, lastProcessedBar is a bucket start, and the
+// paper trader may have proven that bucket complete via a bar beyond
+// it. Fetch past the bucket so aggregation sees the same proof, then
+// truncate to the buckets the paper session actually processed.
+const fetchTo =
+  timeframe === 1
+    ? state.lastProcessedBar
+    : new Date(lastProcessedMs + 2 * timeframe * 60_000).toISOString();
+
 const apiBase = args.get('api') ?? 'http://127.0.0.1:8787';
 let bars: ClosedBar[];
 try {
-  bars = await loadBarsHttp(apiBase, config.symbol, config.from, config.to);
+  bars = await loadBarsHttp(apiBase, config.symbol, config.from, fetchTo);
 } catch {
-  bars = await loadBars(args.get('db') ?? 'data/stocky.duckdb', config.symbol, config.from, config.to);
+  bars = await loadBars(args.get('db') ?? 'data/stocky.duckdb', config.symbol, config.from, fetchTo);
+}
+if (timeframe > 1) {
+  bars = aggregateBars(bars, timeframe).filter(
+    (bar) => Date.parse(bar.bucketStart) <= lastProcessedMs,
+  );
 }
 
 const strategy = buildStrategy(state.config.strategy);

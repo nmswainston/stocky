@@ -17,6 +17,9 @@ export interface PaperConfig {
   takerFeeBps: number;
   makerFeeBps: number;
   slippageBps: number;
+  // Bar duration the strategy trades on, in minutes. Absent in state
+  // files from before timeframes existed, which ran on 1m bars.
+  timeframeMinutes?: number;
   startedAt: string;
 }
 
@@ -24,8 +27,9 @@ export interface PaperStateFile {
   version: 1;
   config: PaperConfig;
   lastProcessedBar: string | null;
-  // Minute gaps between processed bars: collector outages and paper
-  // trader downtime look identical here, and both belong on the record.
+  // Gaps between processed bars, counted at the session's timeframe:
+  // collector outages and paper trader downtime look identical here,
+  // and both belong on the record.
   gaps: Array<{ from: string; to: string; missedBars: number }>;
   main: SerializedBook;
   baseline: SerializedBook;

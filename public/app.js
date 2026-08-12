@@ -183,7 +183,8 @@ async function refreshPaperList() {
       const pct = initial > 0
         ? ` ${(((Number(session.equity) - initial) / initial) * 100).toFixed(2)}%`
         : '';
-      select.append(new Option(`${session.strategyName} ${session.symbol}${pct}`, session.id));
+      const tf = ` ${session.timeframeMinutes ?? 1}m`;
+      select.append(new Option(`${session.strategyName} ${session.symbol}${tf}${pct}`, session.id));
     }
     if ([...select.options].some((option) => option.value === current)) {
       select.value = current;

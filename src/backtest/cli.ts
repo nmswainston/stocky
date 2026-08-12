@@ -33,8 +33,15 @@ function chooseStrategy(): Strategy<unknown> {
       return buildStrategy({ kind: 'buyhold' });
     case 'sma':
       return buildStrategy({ kind: 'sma', fast: numberArg('fast', 20), slow: numberArg('slow', 50) });
+    case 'meanrev':
+      return buildStrategy({
+        kind: 'meanrev',
+        period: numberArg('period', 20),
+        entryZ: numberArg('entry-z', 2),
+        exitZ: numberArg('exit-z', 0.5),
+      });
     default:
-      throw new Error(`unknown strategy ${name}, expected buyhold or sma`);
+      throw new Error(`unknown strategy ${name}, expected buyhold, sma, or meanrev`);
   }
 }
 

@@ -6,7 +6,7 @@ import { createBook, serializeBook } from './session.js';
 import { loadStateFile, saveStateFile, type PaperStateFile } from './state-file.js';
 import { runPaper } from './runner.js';
 
-// npm run paper -- --strategy sma --fast 5 --slow 20 --symbol BTC-USD
+// npm run paper -- --strategy sma --fast 5 --slow 20 --symbol BTC-USD --timeframe 15
 // A session id maps to one state file; running the same id resumes it
 // with its stored config, and flags only matter on first creation.
 
@@ -28,8 +28,13 @@ function strategySpec(): StrategySpec {
 const spec = strategySpec();
 const strategyName = buildStrategy(spec).name;
 const symbol = args.get('symbol') ?? 'BTC-USD';
+const timeframeMinutes = numberArg(args, 'timeframe', 1);
+// The timeframe is part of the default id so the same strategy on 1m
+// and 15m bars are distinct sessions instead of one resuming the other.
+const timeframeTag = timeframeMinutes === 1 ? '' : `-${timeframeMinutes}m`;
 const id =
-  args.get('id') ?? `${strategyName}-${symbol}`.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  args.get('id') ??
+  `${strategyName}-${symbol}${timeframeTag}`.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
 let state = await loadStateFile(directory, id);
 if (state) {
@@ -51,6 +56,7 @@ if (state) {
       takerFeeBps: numberArg(args, 'taker-bps', 60),
       makerFeeBps: numberArg(args, 'maker-bps', 40),
       slippageBps: numberArg(args, 'slippage-bps', 5),
+      timeframeMinutes,
       startedAt: new Date().toISOString(),
     },
     lastProcessedBar: null,

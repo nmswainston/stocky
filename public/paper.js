@@ -81,7 +81,7 @@ export function paperSummarize(state) {
     ? Math.round((Date.now() - Date.parse(state.lastProcessedBar)) / 60_000)
     : null;
   return [
-    `${state.config.strategyName} on ${state.config.symbol}`,
+    `${state.config.strategyName} on ${state.config.symbol} ${state.config.timeframeMinutes ?? 1}m`,
     `strategy ${pct(main)} vs baseline ${pct(baseline)}`,
     `${state.main.fills.length} fills`,
     `${state.gaps.length} gaps`,

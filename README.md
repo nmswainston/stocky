@@ -35,7 +35,7 @@ the collector runs.
 | `npm run up` | Everything: collector plus every existing paper session, restarts on crash, logs to `data/logs/` |
 | `npm run dev` | Collector alone, logs to the terminal |
 | `npm run backtest -- --strategy sma --fast 5 --slow 20` | Backtest against collected bars (`--timeframe 15` for 15m bars, `--save` for the dashboard, `--json` for full results) |
-| `npm run paper -- --strategy sma --fast 5 --slow 20` | Create or resume a paper trading session |
+| `npm run paper -- --strategy sma --fast 5 --slow 20` | Create or resume a paper trading session (`--timeframe 15` to trade 15m bars) |
 | `npm run reconcile -- --id <session-id>` | Prove a paper session and a backtest over the same bars are identical |
 | `npm test` | Vitest suite |
 | `npm run typecheck` | tsc, no emit |

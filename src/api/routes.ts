@@ -111,6 +111,7 @@ async function listPaperSessions(directory: string): Promise<unknown[]> {
         id: parsed.config?.id ?? name.slice(0, -'.json'.length),
         strategyName: parsed.config?.strategyName ?? 'unknown',
         symbol: parsed.config?.symbol ?? 'unknown',
+        timeframeMinutes: parsed.config?.timeframeMinutes ?? 1,
         initialEquity: parsed.config?.initialEquity ?? null,
         equity: curve.length > 0 ? curve[curve.length - 1].equity : parsed.config?.initialEquity,
         lastProcessedBar: parsed.lastProcessedBar ?? null,

@@ -96,8 +96,11 @@ async function loadBars({ fit = false } = {}) {
     );
     priceChart.setBars(data.bars, { fit });
     const missing = countGaps(data.bars);
+    const incomplete = data.bars.filter((bar) => bar.complete === false).length;
     el('bar-info').textContent =
-      `${data.count} bars` + (missing > 0 ? `, ${missing} missing` : '');
+      `${data.count} bars` +
+      (missing > 0 ? `, ${missing} missing` : '') +
+      (incomplete > 0 ? `, ${incomplete} incomplete` : '');
   } catch (error) {
     el('bar-info').textContent = `bars unavailable: ${error.message}`;
   }

@@ -20,10 +20,10 @@ const INSERT_CHUNK_SIZE = 500;
 export class Storage {
   private constructor(private readonly connection: DuckDBConnection) {}
 
-  static async open(): Promise<Storage> {
-    mkdirSync(path.dirname(config.storage.databasePath), { recursive: true });
+  static async open(databasePath: string = config.storage.databasePath): Promise<Storage> {
+    mkdirSync(path.dirname(databasePath), { recursive: true });
     mkdirSync(config.storage.parquetDirectory, { recursive: true });
-    const instance = await DuckDBInstance.create(config.storage.databasePath);
+    const instance = await DuckDBInstance.create(databasePath);
     const connection = await instance.connect();
     const storage = new Storage(connection);
     await storage.createTables();
@@ -53,9 +53,16 @@ export class Storage {
         close DECIMAL(18, 8) NOT NULL,
         volume DECIMAL(18, 8) NOT NULL,
         trade_count INTEGER NOT NULL,
+        complete BOOLEAN NOT NULL DEFAULT true,
         PRIMARY KEY (symbol, bucket_start)
       )
     `);
+    // Migration for databases created before completeness existed. The
+    // added column is nullable there; reads treat null as complete,
+    // since those bars predate taint detection.
+    await this.connection.run(
+      'ALTER TABLE bars_1m ADD COLUMN IF NOT EXISTS complete BOOLEAN DEFAULT true',
+    );
   }
 
   async insertTrades(trades: Trade[]): Promise<void> {
@@ -89,22 +96,51 @@ export class Storage {
     for (const bar of bars) {
       await this.connection.run(
         `
-        INSERT INTO bars_1m (symbol, bucket_start, open, high, low, close, volume, trade_count)
+        INSERT INTO bars_1m (symbol, bucket_start, open, high, low, close, volume, trade_count, complete)
         VALUES (?, CAST(? AS TIMESTAMP),
           CAST(? AS DECIMAL(18, 8)), CAST(? AS DECIMAL(18, 8)),
           CAST(? AS DECIMAL(18, 8)), CAST(? AS DECIMAL(18, 8)),
-          CAST(? AS DECIMAL(18, 8)), ?)
+          CAST(? AS DECIMAL(18, 8)), ?, ?)
         ON CONFLICT (symbol, bucket_start) DO UPDATE SET
           open = excluded.open,
           high = excluded.high,
           low = excluded.low,
           close = excluded.close,
           volume = excluded.volume,
-          trade_count = excluded.trade_count
+          trade_count = excluded.trade_count,
+          complete = excluded.complete
         `,
-        [bar.symbol, bar.bucketStart, bar.open, bar.high, bar.low, bar.close, bar.volume, bar.tradeCount],
+        [bar.symbol, bar.bucketStart, bar.open, bar.high, bar.low, bar.close, bar.volume, bar.tradeCount, bar.complete ?? true],
       );
     }
+  }
+
+  // Recovery writes: bars rebuilt from stored trades for buckets that
+  // were never finalized (the process died mid-bucket). They are only
+  // ever inserted where no bar exists, so a properly finalized bar is
+  // never downgraded by a reconstruction.
+  async insertBarsIfAbsent(bars: Bar[]): Promise<number> {
+    let inserted = 0;
+    for (const bar of bars) {
+      const existing = await this.connection.runAndReadAll(
+        'SELECT 1 FROM bars_1m WHERE symbol = ? AND bucket_start = CAST(? AS TIMESTAMP)',
+        [bar.symbol, bar.bucketStart],
+      );
+      if (existing.getRowObjects().length > 0) continue;
+      await this.connection.run(
+        `
+        INSERT INTO bars_1m (symbol, bucket_start, open, high, low, close, volume, trade_count, complete)
+        VALUES (?, CAST(? AS TIMESTAMP),
+          CAST(? AS DECIMAL(18, 8)), CAST(? AS DECIMAL(18, 8)),
+          CAST(? AS DECIMAL(18, 8)), CAST(? AS DECIMAL(18, 8)),
+          CAST(? AS DECIMAL(18, 8)), ?, ?)
+        ON CONFLICT (symbol, bucket_start) DO NOTHING
+        `,
+        [bar.symbol, bar.bucketStart, bar.open, bar.high, bar.low, bar.close, bar.volume, bar.tradeCount, bar.complete ?? false],
+      );
+      inserted += 1;
+    }
+    return inserted;
   }
 
   // Trades at or after the given instant, oldest first. Used on startup to
@@ -161,6 +197,7 @@ export class Storage {
       close: string;
       volume: string;
       tradeCount: number;
+      complete: boolean;
     }>
   > {
     const bounded = Math.min(Math.max(1, Math.floor(limit)), 50_000);
@@ -172,7 +209,8 @@ export class Storage {
       CAST(low AS VARCHAR) AS low,
       CAST(close AS VARCHAR) AS close,
       CAST(volume AS VARCHAR) AS volume,
-      trade_count
+      trade_count,
+      COALESCE(complete, true) AS complete
     `;
     const bounds = `
       symbol = ?
@@ -197,6 +235,7 @@ export class Storage {
       close: String(row.close),
       volume: String(row.volume),
       tradeCount: Number(row.trade_count),
+      complete: row.complete !== false,
     }));
   }
 

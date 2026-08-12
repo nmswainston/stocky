@@ -43,6 +43,7 @@ export async function loadBarsHttp(
           close: String(bar.close),
           volume: String(bar.volume),
           tradeCount: Number(bar.tradeCount),
+          complete: bar.complete !== false,
         }),
       );
     }

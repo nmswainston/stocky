@@ -148,6 +148,7 @@ export function assembleResult<State>(
       lastBar,
       barCount: bars.length,
       missingBars: missingBarCount(bars, barMs),
+      incompleteBars: bars.filter((bar) => bar.complete === false).length,
       warmupBarsExcluded: outcome.warmupBarsExcluded,
     },
     performance: {

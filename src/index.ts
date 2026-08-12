@@ -181,7 +181,8 @@ const statusServer = startServer(
         barsWritten,
       };
     },
-    readBars: (symbol, from, to, limit) => storage.readBars(symbol, from, to, limit),
+    readBars: (symbol, from, to, limit, direction) =>
+      storage.readBars(symbol, from, to, limit, direction),
     readTicker: () => storage.readTicker(),
     readRecentTrades: (symbol, limit) => storage.readRecentTrades(symbol, limit),
     publicDirectory: path.resolve('public'),

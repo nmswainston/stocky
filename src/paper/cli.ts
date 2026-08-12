@@ -15,13 +15,21 @@ const directory = path.resolve('data', 'paper');
 
 function strategySpec(): StrategySpec {
   const name = args.get('strategy') ?? 'buyhold';
+  if (name === 'meanrev') {
+    return {
+      kind: 'meanrev',
+      period: numberArg(args, 'period', 20),
+      entryZ: numberArg(args, 'entry-z', 2),
+      exitZ: numberArg(args, 'exit-z', 0.5),
+    };
+  }
   switch (name) {
     case 'buyhold':
       return { kind: 'buyhold' };
     case 'sma':
       return { kind: 'sma', fast: numberArg(args, 'fast', 20), slow: numberArg(args, 'slow', 50) };
     default:
-      throw new Error(`unknown strategy ${name}, expected buyhold or sma`);
+      throw new Error(`unknown strategy ${name}, expected buyhold, sma, or meanrev`);
   }
 }
 

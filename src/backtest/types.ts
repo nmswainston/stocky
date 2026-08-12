@@ -9,6 +9,14 @@ export interface ClosedBar {
   close: string;
   volume: string;
   tradeCount: number;
+  // False when the underlying data is known or suspected lossy: a
+  // WebSocket gap landed in this bucket, the bucket was reconstructed
+  // after a crash, or an aggregate is missing source bars. Absent means
+  // complete (bars from before this flag existed). Consumers report it;
+  // nothing fabricates replacement data.
+  complete?: boolean;
+  // On aggregated bars: how many source bars actually contributed.
+  sourceBars?: number;
 }
 
 export type Signal = 'long' | 'flat';
@@ -82,6 +90,10 @@ export interface BacktestResult {
     lastBar: string;
     barCount: number;
     missingBars: number;
+    // Bars present but marked lossy: sequence gaps, crash-recovered
+    // buckets, or aggregates with missing sources. They are replayed
+    // like any other bar, but never silently.
+    incompleteBars: number;
     warmupBarsExcluded: number;
   };
   performance: {

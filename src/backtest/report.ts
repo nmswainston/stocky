@@ -42,8 +42,13 @@ export function renderReport(result: BacktestResult): string {
     `Backtest  ${result.strategyName}  ${config.symbol}  ${config.timeframeMinutes ?? 1}m bars`,
   );
   lines.push(
-    `Data      ${data.firstBar} .. ${data.lastBar}  (${data.barCount} bars, ${data.missingBars} missing, ${data.warmupBarsExcluded} warmup)`,
+    `Data      ${data.firstBar} .. ${data.lastBar}  (${data.barCount} bars, ${data.missingBars} missing, ${data.incompleteBars} incomplete, ${data.warmupBarsExcluded} warmup)`,
   );
+  if (data.incompleteBars > 0) {
+    lines.push(
+      `Caution   ${data.incompleteBars} bars are known-lossy (gaps or crash recovery): ranges and volumes may be understated`,
+    );
+  }
   if (spanHours < 24 * 30) {
     lines.push(
       `Caution   only ${spanHours < 48 ? `${spanHours.toFixed(1)} hours` : `${(spanHours / 24).toFixed(1)} days`} of data: every number below is illustrative, not evidence`,

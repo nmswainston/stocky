@@ -31,34 +31,62 @@ let duplicatesSkipped = 0;
 let lateTrades = 0;
 let barsWritten = 0;
 
+// Buckets whose data is suspect: a sequence gap landed inside them, or
+// they were already in progress when this process started. Their bars
+// are stored marked incomplete rather than silently trusted.
+const taintedBucketsMs = new Set<number>();
+const processStartBucketMs =
+  Math.floor(Date.now() / config.bars.bucketMs) * config.bars.bucketMs;
+
 function todayUtc(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
 function writeBars(bars: Bar[]): void {
   if (bars.length === 0) return;
+  const stamped = bars.map((bar) => {
+    const bucketMs = Date.parse(bar.bucketStart);
+    const complete = bucketMs > processStartBucketMs && !taintedBucketsMs.has(bucketMs);
+    taintedBucketsMs.delete(bucketMs);
+    return { ...bar, complete };
+  });
   storage
-    .upsertBars(bars)
+    .upsertBars(stamped)
     .then(() => {
-      barsWritten += bars.length;
-      for (const bar of bars) logger.info({ bar }, 'bar finalized');
+      barsWritten += stamped.length;
+      for (const bar of stamped) logger.info({ bar }, 'bar finalized');
     })
     .catch((error) => {
-      logger.error({ err: error, count: bars.length }, 'bar write failed');
+      logger.error({ err: error, count: stamped.length }, 'bar write failed');
     });
 }
 
-// Restart recovery: re-seed the duplicate filter from the last few minutes
-// of stored trades, and rebuild the current in-progress bar by replaying
-// this minute's trades through the same pure aggregator.
+// Restart recovery: re-seed the duplicate filter from the last few
+// minutes of stored trades, rebuild the current in-progress bar, and
+// finalize any bucket the previous process died inside of. Recovered
+// bars are built only from trades that reached storage, so they are
+// inserted where no bar exists yet and marked incomplete: the crash
+// may have lost the final seconds of that minute, and no replacement
+// data is fabricated.
 {
   const tenMinutesAgo = new Date(Date.now() - 10 * 60_000).toISOString();
   const recentTrades = await storage.tradesSince(tenMinutesAgo);
-  const currentBucketMs = Math.floor(Date.now() / config.bars.bucketMs) * config.bars.bucketMs;
+  const orphaned: Bar[] = [];
   for (const trade of recentTrades) {
     recentIds.seen(`${trade.symbol}:${trade.tradeId}`);
-    if (bucketStartMsOf(trade.exchangeTime, config.bars.bucketMs) === currentBucketMs) {
-      barState = applyTrade(barState, trade, config.bars.bucketMs).state;
+    const result = applyTrade(barState, trade, config.bars.bucketMs);
+    barState = result.state;
+    orphaned.push(...result.finalized);
+  }
+  const stale = finalizeStale(barState, Date.now(), config.bars.bucketMs, config.bars.finalizeGraceMs);
+  barState = stale.state;
+  orphaned.push(...stale.finalized);
+  if (orphaned.length > 0) {
+    const recovered = await storage.insertBarsIfAbsent(
+      orphaned.map((bar) => ({ ...bar, complete: false })),
+    );
+    if (recovered > 0) {
+      logger.info({ recovered }, 'finalized orphaned buckets from stored trades, marked incomplete');
     }
   }
   if (recentTrades.length > 0) {
@@ -105,6 +133,9 @@ feed.on('message', (payload) => {
   previousSequence = message.sequenceNum;
   if (check.status === 'gap') {
     gapCount += 1;
+    // Messages were lost; whatever bucket is forming now may be missing
+    // trades. Its bar will be stored marked incomplete.
+    taintedBucketsMs.add(Math.floor(Date.now() / config.bars.bucketMs) * config.bars.bucketMs);
     logger.warn(
       { missed: check.missed, sequenceNum: message.sequenceNum, gapCount },
       'sequence gap detected',

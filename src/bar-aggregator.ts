@@ -14,6 +14,9 @@ export interface Bar {
   close: string;
   volume: string;
   tradeCount: number;
+  // Stamped by the collector at write time, not by aggregation: false
+  // when the bucket may be missing trades (sequence gap, restart).
+  complete?: boolean;
 }
 
 interface Accumulator {

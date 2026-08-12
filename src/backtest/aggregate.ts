@@ -8,6 +8,10 @@ import type { ClosedBar } from './types.js';
 // exists past it or because it contains its own closing minute.
 // Emitting a possibly-still-open bucket would reintroduce the repaint
 // class of look-ahead at the higher timeframe.
+//
+// Completeness propagates: an aggregated bar is complete only when
+// every expected source bar is present and every source is itself
+// complete. One lossy minute poisons its whole bucket, deliberately.
 
 interface Accumulator {
   bucketStartMs: number;
@@ -18,6 +22,8 @@ interface Accumulator {
   volumeUnits: bigint;
   tradeCount: number;
   lastMinuteMs: number;
+  sourceBars: number;
+  allSourcesComplete: boolean;
 }
 
 export function aggregateBars(
@@ -45,6 +51,9 @@ export function aggregateBars(
         close: accumulator.close,
         volume: fromUnits(accumulator.volumeUnits),
         tradeCount: accumulator.tradeCount,
+        sourceBars: accumulator.sourceBars,
+        complete:
+          accumulator.allSourcesComplete && accumulator.sourceBars === timeframeMinutes,
       }),
     );
   };
@@ -71,6 +80,8 @@ export function aggregateBars(
         volumeUnits: toUnits(bar.volume),
         tradeCount: bar.tradeCount,
         lastMinuteMs: minuteMs,
+        sourceBars: 1,
+        allSourcesComplete: bar.complete !== false,
       };
     } else {
       current.close = bar.close;
@@ -79,6 +90,8 @@ export function aggregateBars(
       current.volumeUnits += toUnits(bar.volume);
       current.tradeCount += bar.tradeCount;
       current.lastMinuteMs = minuteMs;
+      current.sourceBars += 1;
+      current.allSourcesComplete = current.allSourcesComplete && bar.complete !== false;
     }
   }
 

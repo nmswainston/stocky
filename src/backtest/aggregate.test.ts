@@ -47,6 +47,37 @@ describe('aggregateBars', () => {
     expect(aggregated).toHaveLength(1);
   });
 
+  it('marks buckets incomplete when source bars are missing or lossy', () => {
+    // Full bucket from complete sources: complete.
+    const full = aggregateBars(
+      [bar(0, '100', '101'), bar(1, '101', '102'), bar(2, '102', '103'), bar(3, '103', '104')],
+      3,
+    );
+    expect(full[0]!.complete).toBe(true);
+    expect(full[0]!.sourceBars).toBe(3);
+
+    // Missing minute 1: structurally fine, marked incomplete.
+    const gappy = aggregateBars(
+      [bar(0, '100', '101'), bar(2, '102', '103'), bar(3, '103', '104')],
+      3,
+    );
+    expect(gappy[0]!.complete).toBe(false);
+    expect(gappy[0]!.sourceBars).toBe(2);
+
+    // One lossy source poisons the whole bucket.
+    const tainted = aggregateBars(
+      [
+        bar(0, '100', '101'),
+        bar(1, '101', '102', { complete: false }),
+        bar(2, '102', '103'),
+        bar(3, '103', '104'),
+      ],
+      3,
+    );
+    expect(tainted[0]!.complete).toBe(false);
+    expect(tainted[0]!.sourceBars).toBe(3);
+  });
+
   it('aggregates across interior gaps without inventing data', () => {
     // Minute 1 is missing; minute 3 proves the bucket closed anyway.
     const bars = [

@@ -9,6 +9,11 @@ const COLORS = {
   volume: '#30363d',
   grid: '#1b2129',
   text: '#8b949e',
+  // Bars the collector marked lossy render with amber borders and a
+  // faded body: visibly suspect, direction still readable.
+  incomplete: '#d29922',
+  upFaded: 'rgba(46, 160, 67, 0.35)',
+  downFaded: 'rgba(248, 81, 73, 0.35)',
 };
 
 export function createPriceChart(container) {
@@ -46,13 +51,25 @@ export function createPriceChart(container) {
   return {
     setBars(bars, { fit = false } = {}) {
       candles.setData(
-        bars.map((bar) => ({
-          time: toChartTime(bar.bucketStart),
-          open: Number(bar.open),
-          high: Number(bar.high),
-          low: Number(bar.low),
-          close: Number(bar.close),
-        })),
+        bars.map((bar) => {
+          const point = {
+            time: toChartTime(bar.bucketStart),
+            open: Number(bar.open),
+            high: Number(bar.high),
+            low: Number(bar.low),
+            close: Number(bar.close),
+          };
+          if (bar.complete === false) {
+            const up = point.close >= point.open;
+            return {
+              ...point,
+              color: up ? COLORS.upFaded : COLORS.downFaded,
+              borderColor: COLORS.incomplete,
+              wickColor: COLORS.incomplete,
+            };
+          }
+          return point;
+        }),
       );
       volume.setData(
         bars.map((bar) => ({

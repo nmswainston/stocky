@@ -30,6 +30,7 @@ export interface ApiDependencies {
     from?: string,
     to?: string,
     limit?: number,
+    direction?: 'tail' | 'head',
   ) => Promise<unknown[]>;
   readTicker: () => Promise<unknown[]>;
   readRecentTrades: (symbol: string, limit?: number) => Promise<unknown[]>;
@@ -146,7 +147,8 @@ export function createRequestHandler(deps: ApiDependencies): http.RequestListene
         const from = url.searchParams.get('from') ?? undefined;
         const to = url.searchParams.get('to') ?? undefined;
         const limit = Number(url.searchParams.get('limit') ?? '2000');
-        const bars = await deps.readBars(symbol, from, to, limit);
+        const direction = url.searchParams.get('direction') === 'head' ? 'head' : 'tail';
+        const bars = await deps.readBars(symbol, from, to, limit, direction);
         sendJson(response, 200, { symbol, count: bars.length, bars });
         return;
       }

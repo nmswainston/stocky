@@ -33,7 +33,17 @@ function strategySpec(): StrategySpec {
   }
 }
 
-const spec = strategySpec();
+let spec = strategySpec();
+const volMode = args.get('vol-filter');
+if (volMode === 'above' || volMode === 'below') {
+  spec = {
+    kind: 'volfiltered',
+    mode: volMode,
+    period: numberArg(args, 'vol-period', 20),
+    thresholdBps: numberArg(args, 'vol-bps', 10),
+    inner: spec,
+  };
+}
 const strategyName = buildStrategy(spec).name;
 const symbol = args.get('symbol') ?? 'BTC-USD';
 const timeframeMinutes = numberArg(args, 'timeframe', 1);

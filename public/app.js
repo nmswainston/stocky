@@ -392,6 +392,39 @@ async function refreshHealth() {
   }
 }
 
+async function loadDigest(id) {
+  const response = await fetch(`/api/digests/${id}`, { cache: 'no-store' });
+  el('digest-body').textContent = response.ok
+    ? await response.text()
+    : `could not load digest ${id}`;
+}
+
+async function refreshDigests() {
+  try {
+    const { digests } = await fetchJson('/api/digests');
+    const select = el('digest-select');
+    const current = select.value;
+    select.innerHTML = '';
+    if (digests.length === 0) {
+      select.append(new Option('none yet', ''));
+      return;
+    }
+    for (const id of digests) select.append(new Option(id, id));
+    if (digests.includes(current)) {
+      select.value = current;
+    } else {
+      select.value = digests[0];
+      await loadDigest(digests[0]);
+    }
+  } catch {
+    /* retried on the next tick */
+  }
+}
+
+el('digest-select').addEventListener('change', (event) => {
+  if (event.target.value) loadDigest(event.target.value).catch(() => {});
+});
+
 statusLoop();
 tapeLoop();
 loadBars({ fit: true });
@@ -400,6 +433,8 @@ refreshRace();
 setInterval(refreshRace, 60_000);
 refreshHealth();
 setInterval(refreshHealth, 5 * 60_000);
+refreshDigests();
+setInterval(refreshDigests, 10 * 60_000);
 refreshBacktestList();
 setInterval(refreshBacktestList, 30_000);
 refreshPaperList();

@@ -220,6 +220,7 @@ const statusServer = startServer(
     publicDirectory: path.resolve('public'),
     backtestsDirectory: path.resolve('data', 'backtests'),
     paperDirectory: path.resolve('data', 'paper'),
+    digestsDirectory: path.resolve('data', 'digests'),
     vendorFiles: {
       '/vendor/lightweight-charts.js': path.resolve(
         'node_modules',

@@ -38,6 +38,7 @@ export interface ApiDependencies {
   publicDirectory: string;
   backtestsDirectory: string;
   paperDirectory: string;
+  digestsDirectory: string;
   vendorFiles: Record<string, string>;
 }
 
@@ -48,6 +49,7 @@ const CONTENT_TYPES: Record<string, string> = {
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.md': 'text/plain; charset=utf-8',
 };
 
 function sendJson(response: http.ServerResponse, status: number, body: unknown): void {
@@ -169,6 +171,30 @@ export function createRequestHandler(deps: ApiDependencies): http.RequestListene
         const symbol = url.searchParams.get('symbol') ?? 'BTC-USD';
         const limit = Number(url.searchParams.get('limit') ?? '30');
         sendJson(response, 200, { symbol, trades: await deps.readRecentTrades(symbol, limit) });
+        return;
+      }
+
+      if (route === '/api/digests') {
+        let names: string[] = [];
+        try {
+          names = (await readdir(deps.digestsDirectory))
+            .filter((name) => name.endsWith('.md'))
+            .map((name) => name.slice(0, -'.md'.length))
+            .sort()
+            .reverse();
+        } catch {
+          /* no digests yet */
+        }
+        sendJson(response, 200, { digests: names });
+        return;
+      }
+
+      const digestMatch = /^\/api\/digests\/([A-Za-z0-9-]+)$/.exec(route);
+      if (digestMatch) {
+        const filePath = path.join(deps.digestsDirectory, `${digestMatch[1]}.md`);
+        if (!(await sendFile(response, filePath))) {
+          sendJson(response, 404, { error: 'digest not found' });
+        }
         return;
       }
 

@@ -1,0 +1,13 @@
+# Runs stocky-digest.service shortly after each UTC day closes. The
+# digest itself always summarizes the previous UTC day, so the exact
+# local firing time only affects freshness, not content.
+
+[Unit]
+Description=stocky daily digest timer
+
+[Timer]
+OnCalendar=*-*-* 00:20:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

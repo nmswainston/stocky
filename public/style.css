@@ -161,14 +161,43 @@ select {
 
 .health-strip { display: flex; flex-wrap: wrap; gap: 4px; }
 .health-day {
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
+  width: 36px;
+  height: 30px;
+  border-radius: 5px;
+  background: #21262d;
+  color: #8b949e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.health-day.good { background: #2ea043; color: #0e1116; }
+.health-day.warn { background: #d29922; color: #0e1116; }
+.health-day.bad { background: #f85149; color: #0e1116; }
+
+.health-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.1rem;
+  margin-top: 0.55rem;
+  font-size: 0.72rem;
+  color: #8b949e;
+}
+.health-legend .entry { display: flex; align-items: center; gap: 0.35rem; }
+.health-swatch {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  display: inline-block;
   background: #21262d;
 }
-.health-day.good { background: #2ea043; }
-.health-day.warn { background: #d29922; }
-.health-day.bad { background: #f85149; }
+.health-swatch.good { background: #2ea043; }
+.health-swatch.warn { background: #d29922; }
+.health-swatch.bad { background: #f85149; }
+
+#health-detail { margin-top: 0.45rem; min-height: 1em; }
 
 /* Phone layout: panels tighten, the trade tape drops below the price
    chart instead of beside it, charts shrink to leave room to scroll. */

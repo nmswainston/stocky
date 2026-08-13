@@ -61,9 +61,16 @@
     <section class="panel">
       <div class="panel-head">
         <h2>Health</h2>
-        <span class="muted">daily bar coverage, worst symbol; amber = incomplete data, red = big gaps</span>
+        <span class="muted">daily data collection quality; tap a day for details</span>
       </div>
       <div id="health-strip" class="health-strip"></div>
+      <div class="health-legend">
+        <span class="entry"><span class="health-swatch good"></span>complete: 99%+ of expected bars, none lossy</span>
+        <span class="entry"><span class="health-swatch warn"></span>minor: small gaps or some incomplete bars</span>
+        <span class="entry"><span class="health-swatch bad"></span>degraded: over 5% of bars missing</span>
+        <span class="entry"><span class="health-swatch none"></span>no data</span>
+      </div>
+      <div id="health-detail" class="muted"></div>
     </section>
     <section class="panel">
       <div class="panel-head">

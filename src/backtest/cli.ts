@@ -7,7 +7,7 @@ import { loadBars } from './load-bars.js';
 import { assembleResult } from './metrics.js';
 import { renderReport } from './report.js';
 import { saveResult } from './save-result.js';
-import { buildStrategy } from './strategy-factory.js';
+import { buildStrategy, type StrategySpec } from './strategy-factory.js';
 import type { BacktestConfig, ClosedBar, Strategy } from './types.js';
 
 const args = parseArgs(process.argv.slice(2));
@@ -28,21 +28,38 @@ const config: BacktestConfig = {
 
 function chooseStrategy(): Strategy<unknown> {
   const name = args.get('strategy') ?? 'buyhold';
+  let spec: StrategySpec;
   switch (name) {
     case 'buyhold':
-      return buildStrategy({ kind: 'buyhold' });
+      spec = { kind: 'buyhold' };
+      break;
     case 'sma':
-      return buildStrategy({ kind: 'sma', fast: numberArg('fast', 20), slow: numberArg('slow', 50) });
+      spec = { kind: 'sma', fast: numberArg('fast', 20), slow: numberArg('slow', 50) };
+      break;
     case 'meanrev':
-      return buildStrategy({
+      spec = {
         kind: 'meanrev',
         period: numberArg('period', 20),
         entryZ: numberArg('entry-z', 2),
         exitZ: numberArg('exit-z', 0.5),
-      });
+      };
+      break;
     default:
       throw new Error(`unknown strategy ${name}, expected buyhold, sma, or meanrev`);
   }
+  // --vol-filter above|below wraps the chosen strategy in the
+  // volatility gate; --vol-period and --vol-bps tune it.
+  const volMode = args.get('vol-filter');
+  if (volMode === 'above' || volMode === 'below') {
+    spec = {
+      kind: 'volfiltered',
+      mode: volMode,
+      period: numberArg('vol-period', 20),
+      thresholdBps: numberArg('vol-bps', 10),
+      inner: spec,
+    };
+  }
+  return buildStrategy(spec);
 }
 
 const databasePath = args.get('db') ?? 'data/stocky.duckdb';

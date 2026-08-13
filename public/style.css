@@ -139,6 +139,14 @@ select {
 }
 .fills td { padding: 0.25rem 0.5rem; border-bottom: 1px solid #161b22; }
 
+.digest {
+  font: inherit;
+  font-size: 0.78rem;
+  color: #c9d1d9;
+  white-space: pre-wrap;
+  margin: 0;
+}
+
 .race-legend {
   display: flex;
   flex-wrap: wrap;

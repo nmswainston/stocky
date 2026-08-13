@@ -1,0 +1,18 @@
+# One-shot unit run by stocky-digest.timer: writes yesterday's digest.
+#
+# Install, from the repo directory:
+#   sudo cp scripts/stocky-digest.service scripts/stocky-digest.timer /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now stocky-digest.timer
+#
+# Adjust User/WorkingDirectory/ExecStart paths like stocky.service.
+
+[Unit]
+Description=stocky daily digest
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+WorkingDirectory=/home/pi/stocky
+ExecStart=/usr/bin/node /home/pi/stocky/node_modules/tsx/dist/cli.mjs src/digest.ts

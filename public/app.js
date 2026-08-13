@@ -384,13 +384,23 @@ async function refreshHealth() {
         return `${row.symbol}: ${row.bars}/${expected}${row.incomplete > 0 ? ` (${row.incomplete} incomplete)` : ''}`;
       });
       const grade = worst < 0.95 ? 'bad' : worst < 0.99 || anyIncomplete ? 'warn' : 'good';
-      return `<div class="health-day ${grade}" title="${day}\n${lines.join('\n')}"></div>`;
+      const detail = `${day}: ${lines.join('  ·  ')}`;
+      return (
+        `<div class="health-day ${grade}" title="${day}\n${lines.join('\n')}" data-detail="${detail}">` +
+        `${Number(day.slice(8, 10))}</div>`
+      );
     });
     el('health-strip').innerHTML = cells.join('');
   } catch {
     /* retried on the next tick */
   }
 }
+
+// Tap a day to see its numbers; hover tooltips are useless on a phone.
+el('health-strip').addEventListener('click', (event) => {
+  const cell = event.target.closest('.health-day');
+  if (cell) el('health-detail').textContent = cell.dataset.detail ?? '';
+});
 
 async function loadDigest(id) {
   const response = await fetch(`/api/digests/${id}`, { cache: 'no-store' });

@@ -44,9 +44,10 @@ describe('volatilityFilter', () => {
   });
 
   it('volatility exactly at the threshold counts as not above, exactly', () => {
-    // One move of exactly 10 bps of the prior close, then flat closes:
-    // movement * 10000 == threshold * priceMass, strict > fails.
-    const boundary = ['10000', '10010', '10010', '10010'];
+    // Constructed so movement * 10000 EQUALS threshold * priceMass:
+    // movement 3, price mass 998 + 1001 + 1001 = 3000, so
+    // 3 * 10000 == 10 * 3000. Strict > fails at exact equality.
+    const boundary = ['998', '1001', '1001', '1001'];
     const above = volatilityFilter(buyAndHold, 'above', 3, 10);
     expect(decideOn(boundary, above).signal).toBe('flat');
     const justBelowThreshold = volatilityFilter(buyAndHold, 'above', 3, 9);
@@ -55,9 +56,10 @@ describe('volatilityFilter', () => {
 
   it('keeps consulting the inner strategy while blocked, so its state lives on', () => {
     const inner = meanReversion(5, 1.8, 0.5);
-    const filtered = volatilityFilter(inner, 'below', 5, 5_000);
-    // The plunge is a huge move: filter (below mode) blocks the entry
-    // signal, but the inner state must still record the stretch logic.
+    // The plunge is ~200 bps of window movement; a 50 bps below-mode
+    // threshold counts that as lively and blocks the entry signal,
+    // but the inner state must still record the stretch logic.
+    const filtered = volatilityFilter(inner, 'below', 5, 50);
     const plunge = ['100', '100', '100', '100', '100', '90'];
     const decision = decideOn(plunge, filtered);
     expect(decision.signal).toBe('flat');

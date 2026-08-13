@@ -4,6 +4,7 @@
 import { countGaps, createPriceChart } from './candles.js';
 import { createEquityChart, fillMarkers, summarize } from './equity.js';
 import { createPaperChart, paperCardData, paperSummarize } from './paper.js';
+import { RACE_PALETTE, createRaceChart, lastReturnPct } from './race.js';
 import { localDateTime, localTime } from './time.js';
 
 const el = (id) => document.getElementById(id);
@@ -308,10 +309,97 @@ el('backtest-select').addEventListener('change', async (event) => {
 
 el('symbol-select').addEventListener('change', applyBacktestMarkers);
 
+const raceChart = createRaceChart(el('race-chart'));
+
+async function refreshRace() {
+  try {
+    const { sessions } = await fetchJson('/api/paper');
+    const details = (
+      await Promise.all(
+        sessions.map((s) => fetchJson(`/api/paper/${s.id}`).catch(() => null)),
+      )
+    ).filter((state) => state && state.main.equityCurve.length > 0);
+
+    const entries = [];
+    const baselines = new Map();
+    details.forEach((state, index) => {
+      const initial = Number(state.config.initialEquity);
+      const timeframe = state.config.timeframeMinutes ?? 1;
+      entries.push({
+        label: `${state.config.strategyName} ${state.config.symbol.replace('-USD', '')} ${timeframe}m`,
+        color: RACE_PALETTE[index % RACE_PALETTE.length],
+        dashed: false,
+        initial,
+        curve: state.main.equityCurve,
+      });
+      const key = `${state.config.symbol}/${timeframe}`;
+      if (!baselines.has(key) && state.baseline.equityCurve.length > 0) {
+        baselines.set(key, {
+          label: `hold ${state.config.symbol.replace('-USD', '')} ${timeframe}m`,
+          color: '#6e7681',
+          dashed: true,
+          initial,
+          curve: state.baseline.equityCurve,
+        });
+      }
+    });
+    const all = [...entries, ...baselines.values()];
+    raceChart.setEntries(all);
+    el('race-legend').innerHTML = all
+      .map((entry) => {
+        const pct = lastReturnPct(entry.curve, entry.initial);
+        return (
+          `<span class="entry"><span class="swatch" style="background:${entry.color}"></span>` +
+          `${entry.label} <b class="${pct >= 0 ? 'gain' : 'loss'}">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</b></span>`
+        );
+      })
+      .join('');
+  } catch {
+    /* retried on the next tick */
+  }
+}
+
+async function refreshHealth() {
+  try {
+    const { days, firstBars, now } = await fetchJson('/api/health');
+    const nowMs = Date.parse(now);
+    const byDay = new Map();
+    for (const row of days) {
+      if (!byDay.has(row.day)) byDay.set(row.day, []);
+      byDay.get(row.day).push(row);
+    }
+    const cells = [...byDay.keys()].sort().slice(-14).map((day) => {
+      const dayStartMs = Date.parse(`${day}T00:00:00Z`);
+      const dayEndMs = dayStartMs + 24 * 60 * 60 * 1000;
+      let worst = 1;
+      let anyIncomplete = false;
+      const lines = byDay.get(day).map((row) => {
+        const firstMs = Date.parse(firstBars[row.symbol] ?? `${day}T00:00:00Z`);
+        const windowStart = Math.max(dayStartMs, firstMs);
+        const windowEnd = Math.min(dayEndMs, nowMs);
+        const expected = Math.max(1, Math.round((windowEnd - windowStart) / 60_000));
+        const coverage = Math.min(1, row.bars / expected);
+        worst = Math.min(worst, coverage);
+        if (row.incomplete > 0) anyIncomplete = true;
+        return `${row.symbol}: ${row.bars}/${expected}${row.incomplete > 0 ? ` (${row.incomplete} incomplete)` : ''}`;
+      });
+      const grade = worst < 0.95 ? 'bad' : worst < 0.99 || anyIncomplete ? 'warn' : 'good';
+      return `<div class="health-day ${grade}" title="${day}\n${lines.join('\n')}"></div>`;
+    });
+    el('health-strip').innerHTML = cells.join('');
+  } catch {
+    /* retried on the next tick */
+  }
+}
+
 statusLoop();
 tapeLoop();
 loadBars({ fit: true });
 scheduleBars();
+refreshRace();
+setInterval(refreshRace, 60_000);
+refreshHealth();
+setInterval(refreshHealth, 5 * 60_000);
 refreshBacktestList();
 setInterval(refreshBacktestList, 30_000);
 refreshPaperList();

@@ -216,6 +216,7 @@ const statusServer = startServer(
       storage.readBars(symbol, from, to, limit, direction),
     readTicker: () => storage.readTicker(),
     readRecentTrades: (symbol, limit) => storage.readRecentTrades(symbol, limit),
+    readHealth: () => storage.readHealth(),
     publicDirectory: path.resolve('public'),
     backtestsDirectory: path.resolve('data', 'backtests'),
     paperDirectory: path.resolve('data', 'paper'),

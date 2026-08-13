@@ -239,6 +239,42 @@ export class Storage {
     }));
   }
 
+  // Per-day, per-symbol bar counts for the health timeline. Expected
+  // counts are computed by the caller from each symbol's first bar and
+  // the current time, so partial first days and today read fairly.
+  async readHealth(): Promise<{
+    days: Array<{ day: string; symbol: string; bars: number; incomplete: number }>;
+    firstBars: Record<string, string>;
+  }> {
+    const rows = await this.connection.runAndReadAll(`
+      SELECT
+        CAST(CAST(bucket_start AS DATE) AS VARCHAR) AS day,
+        symbol,
+        COUNT(*) AS bars,
+        SUM(CASE WHEN COALESCE(complete, true) THEN 0 ELSE 1 END) AS incomplete
+      FROM bars_1m
+      GROUP BY 1, 2
+      ORDER BY 1, 2
+    `);
+    const firsts = await this.connection.runAndReadAll(`
+      SELECT symbol, strftime(MIN(bucket_start), '%Y-%m-%dT%H:%M:%S.%f') || 'Z' AS first_bar
+      FROM bars_1m GROUP BY symbol
+    `);
+    const firstBars: Record<string, string> = {};
+    for (const row of firsts.getRowObjects()) {
+      firstBars[String(row.symbol)] = String(row.first_bar);
+    }
+    return {
+      days: rows.getRowObjects().map((row) => ({
+        day: String(row.day),
+        symbol: String(row.symbol),
+        bars: Number(row.bars),
+        incomplete: Number(row.incomplete),
+      })),
+      firstBars,
+    };
+  }
+
   // Latest trade per symbol, for the dashboard's price readout. The
   // trades table holds the current UTC day, which is exactly the
   // liveness window this exists to show.

@@ -139,6 +139,29 @@ select {
 }
 .fills td { padding: 0.25rem 0.5rem; border-bottom: 1px solid #161b22; }
 
+.race-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.1rem;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: #8b949e;
+}
+.race-legend .entry { display: flex; align-items: center; gap: 0.35rem; }
+.race-legend .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.race-legend b { color: #c9d1d9; font-weight: 600; }
+
+.health-strip { display: flex; flex-wrap: wrap; gap: 4px; }
+.health-day {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: #21262d;
+}
+.health-day.good { background: #2ea043; }
+.health-day.warn { background: #d29922; }
+.health-day.bad { background: #f85149; }
+
 /* Phone layout: panels tighten, the trade tape drops below the price
    chart instead of beside it, charts shrink to leave room to scroll. */
 @media (max-width: 720px) {

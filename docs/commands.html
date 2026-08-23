@@ -140,6 +140,10 @@
       <td><code>npm run reconcile -- --id sma-crossover-5-20-btc-usd</code></td>
       <td>Proves paper results equal backtest results on the same bars. RECONCILED = healthy</td>
     </tr>
+    <tr>
+      <td><code>npm run walkforward -- --strategy sma --fast 5 --slow 20 --timeframe 60 --folds 4</code></td>
+      <td>Splits history into folds and tests the same strategy in each. Only a strategy that is positive AND beats hold in most folds is interesting; one good fold is luck</td>
+    </tr>
   </table>
 
   <h2>Maintenance and checks</h2>

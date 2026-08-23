@@ -23,6 +23,10 @@ ExecStart=/usr/bin/node /home/pi/stocky/node_modules/tsx/dist/cli.mjs src/superv
 # Serve the dashboard to the LAN; the API is read-only market data.
 # Delete this line to keep it loopback-only.
 Environment=STOCKY_HOST=0.0.0.0
+# Dead-man's switch (optional): set to a healthchecks.io ping URL and
+# the collector pings it every 5 minutes while healthy; the monitor
+# alerts when pings stop. Leave unset to disable.
+# Environment=STOCKY_HEARTBEAT_URL=https://hc-ping.com/your-check-uuid
 Restart=on-failure
 RestartSec=10
 

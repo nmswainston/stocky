@@ -235,6 +235,31 @@ const statusServer = startServer(
 buffer.start();
 feed.start();
 
+// Heartbeat pings go out only while genuinely healthy: connected AND
+// recent data. A wedged process, dead feed, dead network, or dead box
+// all stop the pings, and the external monitor alerts on the silence.
+let heartbeatTimer: NodeJS.Timeout | null = null;
+if (config.heartbeat.url) {
+  const heartbeatUrl = config.heartbeat.url;
+  const ping = (): void => {
+    const stats = feed.stats();
+    const fresh =
+      stats.lastMessageAt !== null &&
+      Date.now() - Date.parse(stats.lastMessageAt) < config.heartbeat.staleAfterMs;
+    if (!stats.connected || !fresh) {
+      logger.warn({ connected: stats.connected, lastMessageAt: stats.lastMessageAt }, 'heartbeat skipped, feed unhealthy');
+      return;
+    }
+    fetch(heartbeatUrl, { method: 'POST', signal: AbortSignal.timeout(10_000) }).catch((error) => {
+      logger.warn({ err: error instanceof Error ? error.message : error }, 'heartbeat ping failed');
+    });
+  };
+  heartbeatTimer = setInterval(ping, config.heartbeat.intervalMs);
+  // First ping soon after startup so the monitor sees recovery quickly.
+  setTimeout(ping, 30_000);
+  logger.info({ intervalMs: config.heartbeat.intervalMs }, 'heartbeat enabled');
+}
+
 let shuttingDown = false;
 async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;
@@ -244,6 +269,7 @@ async function shutdown(signal: string): Promise<void> {
   statusServer.close();
   clearInterval(exportTimer);
   clearInterval(finalizeTimer);
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
   try {
     await buffer.stop();
     const result = finalizeAll(barState);

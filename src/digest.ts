@@ -25,6 +25,21 @@ const outDirectory = path.resolve(args.get('out') ?? path.join('data', 'digests'
 const pct = (from: number, to: number): string =>
   `${to >= from ? '+' : ''}${(((to - from) / from) * 100).toFixed(2)}%`;
 
+// A boot-time catch-up run can start seconds before the collector has
+// its API up; without this wait it fell through to the file loader,
+// lost the database lock race, and died writing nothing. Bounded so
+// offline use (collector intentionally down) still proceeds to the
+// file loader after ~40s.
+for (let attempt = 0; attempt < 4; attempt += 1) {
+  try {
+    const response = await fetch(`${apiBase}/api/status`, { signal: AbortSignal.timeout(3_000) });
+    if (response.ok) break;
+  } catch {
+    /* not up yet */
+  }
+  await new Promise((resolve) => setTimeout(resolve, 10_000));
+}
+
 async function barsFor(symbol: string): Promise<ClosedBar[]> {
   const to = new Date(dayEndMs - 60_000).toISOString();
   try {

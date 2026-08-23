@@ -9,7 +9,9 @@
 
 [Unit]
 Description=stocky daily digest
-After=network-online.target
+# After stocky.service so a boot-time catch-up run (Persistent=true on
+# the timer) does not race the collector for the database file.
+After=network-online.target stocky.service
 
 [Service]
 Type=oneshot

@@ -24,6 +24,18 @@ export const config = {
     // so slightly late trades still land in the right bar.
     finalizeGraceMs: 5_000,
   },
+  heartbeat: {
+    // Dead-man's switch: while the feed is healthy the collector pings
+    // this URL every interval; an external monitor (e.g. a
+    // healthchecks.io check) alerts when the pings STOP. Silence is
+    // the signal, which is the only design that also catches power
+    // loss and dead network, where the box cannot send anything.
+    // Unset means disabled.
+    url: process.env.STOCKY_HEARTBEAT_URL ?? null,
+    intervalMs: 5 * 60_000,
+    // A ping is only sent when a feed message arrived this recently.
+    staleAfterMs: 2 * 60_000,
+  },
   status: {
     // Loopback by default. On a headless box set STOCKY_HOST=0.0.0.0
     // to reach the dashboard from other machines on the LAN; the API

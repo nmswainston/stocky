@@ -17,7 +17,8 @@ export interface ResearchSecrets {
   anthropicApiKey: string | null;
 }
 
-export function readSecrets(options: { needClaude: boolean }): ResearchSecrets {
+export function readSecrets(options: { needClaude: boolean; needSec?: boolean }): ResearchSecrets {
+  const needSec = options.needSec ?? true;
   const missing: string[] = [];
   const get = (name: string): string => {
     const value = process.env[name]?.trim();
@@ -27,7 +28,7 @@ export function readSecrets(options: { needClaude: boolean }): ResearchSecrets {
   const secrets: ResearchSecrets = {
     alpacaKeyId: get('ALPACA_API_KEY_ID'),
     alpacaSecretKey: get('ALPACA_API_SECRET_KEY'),
-    secUserAgent: get('SEC_USER_AGENT'),
+    secUserAgent: needSec ? get('SEC_USER_AGENT') : process.env.SEC_USER_AGENT ?? '',
     anthropicApiKey: options.needClaude ? get('ANTHROPIC_API_KEY') : process.env.ANTHROPIC_API_KEY ?? null,
   };
   if (missing.length > 0) {
@@ -35,7 +36,7 @@ export function readSecrets(options: { needClaude: boolean }): ResearchSecrets {
       `missing ${missing.join(', ')}. Copy .env.example to .env and fill it in (see README, Stock research).`,
     );
   }
-  if (!/\S+@\S+/.test(secrets.secUserAgent)) {
+  if (needSec && !/\S+@\S+/.test(secrets.secUserAgent)) {
     throw new Error('SEC_USER_AGENT must include a contact email, for example "Stocky research you@example.com"');
   }
   return secrets;

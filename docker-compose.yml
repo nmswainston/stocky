@@ -1,0 +1,47 @@
+# Stocky on a self-hosted server. Setup and the Pi differences are in
+# docs/server.md.
+#
+#   docker compose up -d --build                       always-on supervisor + dashboard
+#   docker compose --profile jobs run --rm research     one research digest now
+#   docker compose --profile jobs run --rm research --dry-run   data check, no Claude cost
+#
+# The daily research run is started by the host's systemd timer in
+# scripts/docker/, not by a container that sleeps all day.
+
+services:
+  stocky:
+    build: .
+    image: stocky:local
+    restart: unless-stopped
+    # Match the host user that owns ./data (see docs/server.md).
+    user: "${STOCKY_UID:-1000}:${STOCKY_GID:-1000}"
+    environment:
+      STOCKY_HOST: 0.0.0.0
+      # Optional dead-man's switch URL; leave unset to disable.
+      STOCKY_HEARTBEAT_URL: ${STOCKY_HEARTBEAT_URL:-}
+    # Bound to the server itself only. Reach it from your phone over
+    # Tailscale (see docs/server.md) rather than opening it to the LAN.
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - ./data:/app/data
+    # The collector needs no API keys, so it does not get .env.
+
+  research:
+    build: .
+    image: stocky:local
+    profiles: ["jobs"]
+    restart: "no"
+    # A one-shot job serves no dashboard, so the image's check does not apply.
+    healthcheck:
+      disable: true
+    user: "${STOCKY_UID:-1000}:${STOCKY_GID:-1000}"
+    # Alpaca market data, Anthropic and SEC user agent. Research only:
+    # this job has no broker or order code.
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    # An entrypoint, not a command, so flags append:
+    #   docker compose --profile jobs run --rm research --dry-run
+    entrypoint: ["node", "node_modules/tsx/dist/cli.mjs", "src/research/cli.ts"]
+    command: []

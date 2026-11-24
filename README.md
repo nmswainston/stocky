@@ -92,6 +92,22 @@ that line for loopback-only plus an SSH tunnel). Logs:
 a couple of paper sessions, and run backtests from another machine
 against the Pi's API.
 
+### Docker (self-hosted server)
+
+On a bigger Linux box, run Stocky in Docker instead. The always-on
+container runs the supervisor, a separate job runs the weekday stock
+research, and `data/` plus `.env` stay on the host:
+
+```
+cp .env.example .env   # fill in keys, chmod 600
+docker compose up -d --build
+docker compose --profile jobs run --rm research --dry-run
+```
+
+The dashboard is published on loopback only; use Tailscale to read it
+on a phone. Full steps, the systemd timer, moving data over from a Pi,
+and backups are in [docs/server.md](docs/server.md).
+
 ## Data layout
 
 ```

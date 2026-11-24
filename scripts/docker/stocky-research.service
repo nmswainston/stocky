@@ -1,0 +1,22 @@
+# Runs one research digest in Docker. Started by stocky-research.timer.
+# For the Docker setup only; scripts/stocky-research.service is the
+# bare-Node version for the Pi.
+#
+# Install (from the repo directory, after `docker compose build`):
+#   sudo cp scripts/docker/stocky-research.service scripts/docker/stocky-research.timer /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now stocky-research.timer
+#
+# Set WorkingDirectory to wherever you cloned stocky.
+
+[Unit]
+Description=stocky stock research digest (Docker)
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/stocky
+ExecStart=/usr/bin/docker compose --profile jobs run --rm research
+TimeoutStartSec=20min

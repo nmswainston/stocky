@@ -1,0 +1,22 @@
+# One-shot unit run by stocky-research.timer: writes the stock research
+# digest for the coming session. Research only; it places no orders.
+#
+# Install, from the repo directory (after filling in .env):
+#   sudo cp scripts/stocky-research.service scripts/stocky-research.timer /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now stocky-research.timer
+#
+# Adjust User/WorkingDirectory/ExecStart paths for the machine it runs on.
+
+[Unit]
+Description=stocky stock research digest
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+WorkingDirectory=/home/pi/stocky
+ExecStart=/usr/bin/node /home/pi/stocky/node_modules/tsx/dist/cli.mjs src/research/cli.ts
+# A hung network call should not hold the unit forever.
+TimeoutStartSec=20min

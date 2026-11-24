@@ -39,6 +39,7 @@ the collector runs.
 | `npm run reconcile -- --id <session-id>` | Prove a paper session and a backtest over the same bars are identical |
 | `npm run digest -- --date YYYY-MM-DD` | Write the markdown daily digest (defaults to yesterday UTC; a systemd timer runs it nightly) |
 | `npm run walkforward -- --strategy sma --fast 5 --slow 20 --timeframe 60 --folds 4` | Test the same fixed strategy independently across contiguous folds of history; repeatability, not curve fit |
+| `npm run research` | Stock research digest: Claude writes a cited thesis on the day's most active watchlist names. Research only, no orders (`--dry-run` to skip Claude, `--symbols AAPL,MSFT --limit 2` to narrow it) |
 | `npm test` | Vitest suite |
 | `npm run typecheck` | tsc, no emit |
 
@@ -98,7 +99,65 @@ data/
   backtests/             saved backtest results (JSON, rendered by the dashboard)
   paper/                 paper session state files (JSON, atomic writes)
   logs/                  supervisor child logs
+  digests/               crypto digests and research-YYYY-MM-DD.md stock digests
+  research/YYYY-MM-DD/   theses, snapshots, prompts and cost for each research run
+  research/cache/edgar/  SEC responses, reused for 20 hours
 ```
+
+## Stock research (research only)
+
+The first step toward stocks. Every weekday morning it reads prices and
+news from Alpaca's free market data feed and filings plus quarterly
+figures from SEC EDGAR for a watchlist, screens for the names where
+something happened, and asks Claude for a short thesis on those, scored
+from -5 to +5. It writes a markdown digest that shows up in the
+dashboard's Daily digest picker. Nothing here can place an order:
+`src/research/no-orders.test.ts` fails the build if a trading endpoint
+appears in the module.
+
+```
+Alpaca market data (bars, news) + SEC EDGAR (filings, XBRL facts)
+        |
+   collect: daily bars for the watchlist + SPY, 7 days of news, 120 days of filings
+        |
+   screen: plain math ranks unusual moves, volume, news and fresh 10-Q/10-K filings
+        |
+   research: Claude (no tools) reads one snapshot, returns JSON with cited points
+        |
+   check: code drops uncited points and made-up source ids, zeroes unsupported scores
+        |
+   digest: data/digests/research-YYYY-MM-DD.md (+ everything behind it in data/research/)
+```
+
+The rules that keep it honest:
+
+- **Cite or drop.** Every fact in a snapshot has a source id. A thesis
+  point that cites nothing real is removed, and the digest says so.
+- **No lookahead.** Nothing stamped at or after the run time reaches the
+  prompt, and filings use the first report of each quarter, not later
+  restatements.
+- **Hard spend cap.** Before each call the worst case (whole prompt plus
+  every allowed output token) is checked against the daily budget.
+- **Traceable.** Each run saves the exact prompts, snapshots and token
+  counts, so any score can be traced back to what it was based on.
+
+### Setup
+
+1. Copy `.env.example` to `.env` and fill in the Alpaca keys (from the
+   Paper trading dashboard; only market data is used), an Anthropic API
+   key, and an SEC user agent with your email. Needs Node 20.12 or newer
+   for the built-in `.env` loader.
+2. Try it without spending anything: `npm run research -- --dry-run`.
+   It fetches the data, builds the prompts into
+   `data/research/<date>/prompts/`, and estimates tokens.
+3. One real stock: `npm run research -- --symbols AAPL --limit 1`
+   (about 4 cents on Claude Sonnet 5.5).
+4. Daily: install `scripts/stocky-research.service` and `.timer` (runs
+   weekdays at 12:30 UTC, 5:30 AM in Phoenix).
+
+Defaults: 20 large US stocks, 8 researched a day, Claude Sonnet 5.5,
+$0.75 a day cap (roughly $5 to $15 a month in practice). All settings
+are in `src/research/config.ts` and can be overridden in `.env`.
 
 ## Design rules that keep the numbers honest
 
@@ -137,6 +196,8 @@ data/
 
 ## Dependencies
 
-9 of a self-imposed budget of 12: ws, @duckdb/node-api, pino,
-lightweight-charts, and dev: typescript, tsx, vitest, @types/node,
-@types/ws.
+10 of a self-imposed budget of 12: ws, @duckdb/node-api, pino,
+lightweight-charts, @anthropic-ai/sdk, and dev: typescript, tsx,
+vitest, @types/node, @types/ws. Alpaca and SEC EDGAR are called with
+plain fetch, and Claude's JSON is checked by hand rather than with a
+schema library, to stay inside the budget.

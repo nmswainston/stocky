@@ -1,0 +1,14 @@
+# Weekday mornings at 12:30 UTC: 5:30 AM in Phoenix all year, which is
+# an hour or two before the US open (7:30 AM in winter, 6:30 AM in
+# summer, because New York changes clocks and Arizona does not).
+# Market holidays still run; the digest just shows no new session.
+
+[Unit]
+Description=stocky stock research digest timer
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 12:30:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

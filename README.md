@@ -40,6 +40,8 @@ the collector runs.
 | `npm run digest -- --date YYYY-MM-DD` | Write the markdown daily digest (defaults to yesterday UTC; a systemd timer runs it nightly) |
 | `npm run walkforward -- --strategy sma --fast 5 --slow 20 --timeframe 60 --folds 4` | Test the same fixed strategy independently across contiguous folds of history; repeatability, not curve fit |
 | `npm run research` | Stock research digest: Claude writes a cited thesis on the day's most active watchlist names. Research only, no orders (`--dry-run` to skip Claude, `--symbols AAPL,MSFT --limit 2` to narrow it) |
+| `npm run research:backtest -- --from 2023-01-01 --every 5 --hold 20 --top 5` | Replay past prices: does the screen find movers, and does a plain rule score beat SPY? No Claude calls |
+| `npm run research:scorecard -- --horizon 20` | Grade saved theses against what happened next, by score, versus SPY |
 | `npm test` | Vitest suite |
 | `npm run typecheck` | tsc, no emit |
 
@@ -154,6 +156,29 @@ The rules that keep it honest:
    (about 4 cents on Claude Sonnet 5.5).
 4. Daily: install `scripts/stocky-research.service` and `.timer` (runs
    weekdays at 12:30 UTC, 5:30 AM in Phoenix).
+
+### Backtest and scorecard
+
+Two honest ways to check the research, neither of which spends on Claude:
+
+- `npm run research:backtest` replays past daily bars. It tests the parts
+  that are plain rules: whether the screen points at stocks that then
+  move, and whether a simple momentum score (trend versus SPY plus
+  distance from the 50 day average) beats SPY after 10 bps a round trip.
+  That score is the bar Claude has to clear.
+- `npm run research:scorecard` grades saved theses: the stock's return
+  minus SPY's over the next 20 sessions, grouped by score. Positive
+  theses should beat SPY and negative ones should trail it.
+
+Claude itself is not backtested on purpose. A model shown a 2024 snapshot
+already knows how 2024 ended, so its old theses look smarter than they
+were. The real test is the live digests, graded forward. `npm run
+research -- --as-of 2025-03-03 --limit 3` exists as a cheap smoke test of
+the pipeline on past dates; those runs are saved under
+`data/research/as-of/`, marked, and reported separately.
+
+The watchlist is today's large caps, picked with hindsight
+(survivorship bias), so every backtest on it flatters the strategy.
 
 Defaults: 20 large US stocks, 8 researched a day, Claude Sonnet 5.5,
 $0.75 a day cap (roughly $5 to $15 a month in practice). All settings

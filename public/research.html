@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stock research · stocky</title>
+  <meta name="description" content="Stocky's daily stock research: cited theses and the watchlist. Read only.">
+  <link rel="icon" href="/icon.svg">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1116" media="(prefers-color-scheme: dark)">
+  <link rel="stylesheet" href="/research.css">
+  <script src="/research.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#theses-heading">Skip to theses</a>
+
+  <header class="top">
+    <div class="top-row">
+      <h1>Stock research</h1>
+      <nav aria-label="Dashboards">
+        <a href="/">Crypto dashboard</a>
+      </nav>
+    </div>
+    <form class="day-picker" id="day-form">
+      <label for="day-select">Day</label>
+      <select id="day-select" name="date" disabled>
+        <option>Loading...</option>
+      </select>
+    </form>
+  </header>
+
+  <main>
+    <p class="note" role="note">
+      Research only. Nothing on this page can place an order. Scores are an AI
+      opinion checked against the cited data, not advice.
+    </p>
+
+    <p id="run-meta" class="meta" aria-live="polite"></p>
+
+    <section aria-labelledby="theses-heading">
+      <h2 id="theses-heading" tabindex="-1">Theses</h2>
+      <p class="hint">Highest score first. Scores run from -5 (avoid) to +5 (strong candidate).</p>
+      <div id="theses"></div>
+    </section>
+
+    <section aria-labelledby="watch-heading">
+      <h2 id="watch-heading">Watchlist</h2>
+      <div class="table-wrap" role="region" aria-labelledby="watch-heading" tabindex="0">
+        <table id="watch-table">
+          <thead>
+            <tr>
+              <th scope="col">Symbol</th>
+              <th scope="col" class="num">Close</th>
+              <th scope="col" class="num">5 day</th>
+              <th scope="col" class="num">20 day</th>
+              <th scope="col" class="num">vs SPY</th>
+              <th scope="col">Read</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="skipped"></div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>Full markdown digests are in the crypto dashboard's Daily digest panel.</p>
+  </footer>
+</body>
+</html>

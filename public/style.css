@@ -17,6 +17,7 @@ header {
 }
 
 h1 { font-size: 1.1rem; letter-spacing: 0.08em; }
+.header-link { color: #58a6ff; font-size: 0.85rem; }
 h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.1em; color: #8b949e; }
 
 .status-strip {

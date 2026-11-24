@@ -2,6 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import { logger } from '../logger.js';
+import { listResearchDays, readResearchDay } from '../research/library.js';
 
 // All routes the collector answers. Reads only: nothing here can write
 // to storage, place an order, or touch the collection hot path beyond
@@ -39,6 +40,7 @@ export interface ApiDependencies {
   backtestsDirectory: string;
   paperDirectory: string;
   digestsDirectory: string;
+  researchDirectory: string;
   vendorFiles: Record<string, string>;
 }
 
@@ -195,6 +197,21 @@ export function createRequestHandler(deps: ApiDependencies): http.RequestListene
         if (!(await sendFile(response, filePath))) {
           sendJson(response, 404, { error: 'digest not found' });
         }
+        return;
+      }
+
+      // Stock research, read only: the days on file and one day joined
+      // from theses.json, run.json and snapshots.json.
+      if (route === '/api/research') {
+        sendJson(response, 200, { days: await listResearchDays(deps.researchDirectory) });
+        return;
+      }
+
+      const researchMatch = /^\/api\/research\/(\d{4}-\d{2}-\d{2})$/.exec(route);
+      if (researchMatch) {
+        const day = await readResearchDay(deps.researchDirectory, researchMatch[1]!);
+        if (day) sendJson(response, 200, day);
+        else sendJson(response, 404, { error: 'research day not found' });
         return;
       }
 

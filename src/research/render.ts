@@ -17,10 +17,11 @@ function trim(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max - 1)}...` : text;
 }
 
-function renderThesis(thesis: Thesis, snapshot: Snapshot | undefined): string[] {
+function renderThesis(thesis: Thesis, snapshot: Snapshot | undefined, discovered: boolean): string[] {
   const lines: string[] = [];
   const name = snapshot?.companyName ? ` (${snapshot.companyName})` : '';
-  lines.push(`### ${thesis.symbol}${name}: ${signed(thesis.score)}, ${thesis.confidence} confidence`, '');
+  const found = discovered ? ' [new find]' : '';
+  lines.push(`### ${thesis.symbol}${name}${found}: ${signed(thesis.score)}, ${thesis.confidence} confidence`, '');
   if (thesis.summary) lines.push(thesis.summary, '');
 
   // Number each cited source once per thesis, in order of first use.
@@ -80,7 +81,29 @@ export function renderDigest(result: RunResult): string {
   }
   const sorted = [...result.theses].sort((a, b) => b.score - a.score || a.symbol.localeCompare(b.symbol));
   for (const thesis of sorted) {
-    lines.push(...renderThesis(thesis, result.snapshots.find((item) => item.symbol === thesis.symbol)));
+    const discovered = result.rows.some((row) => row.symbol === thesis.symbol && row.discovered);
+    lines.push(...renderThesis(thesis, result.snapshots.find((item) => item.symbol === thesis.symbol), discovered));
+  }
+
+  if (result.discovery) {
+    const d = result.discovery;
+    lines.push('## New finds', '');
+    const found = result.rows.filter((row) => row.discovered);
+    lines.push(
+      `Scanned ${d.scanned} large US stocks beyond the watchlist; ${d.liquid} passed the price and volume checks.`,
+      '',
+    );
+    if (found.length === 0) {
+      lines.push('Nothing unusual enough to add today.', '');
+    } else {
+      for (const row of found) {
+        lines.push(
+          `- ${row.symbol}${row.companyName ? ` (${row.companyName})` : ''}: ${row.discoveryReason ?? 'unusual activity'}` +
+            `${row.researched ? ', researched below' : ', not researched today'}`,
+        );
+      }
+      lines.push('');
+    }
   }
 
   lines.push('## Watchlist', '');
@@ -92,6 +115,7 @@ export function renderDigest(result: RunResult): string {
     const fresh = [
       row.newNews > 0 ? `${row.newNews} news` : '',
       ...row.newFilings,
+      row.discovered ? 'new find' : '',
       row.researched ? 'researched' : '',
     ]
       .filter(Boolean)
@@ -104,10 +128,12 @@ export function renderDigest(result: RunResult): string {
   lines.push('');
 
   const problems = result.rows.filter((row) => row.dataProblems.length > 0);
-  if (result.skipped.length > 0 || problems.length > 0) {
+  const scanProblems = result.discovery?.problems ?? [];
+  if (result.skipped.length > 0 || problems.length > 0 || scanProblems.length > 0) {
     lines.push('## Gaps', '');
     for (const item of result.skipped) lines.push(`- ${item.symbol}: skipped, ${item.reason}`);
     for (const row of problems) lines.push(`- ${row.symbol}: ${row.dataProblems.join('; ')}`);
+    for (const problem of scanProblems) lines.push(`- discovery: ${problem}`);
     lines.push('');
   }
 

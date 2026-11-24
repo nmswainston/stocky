@@ -15,7 +15,8 @@ import { runResearch, type RunSources } from './run.js';
 //
 //   npm run research                      full run (needs all keys in .env)
 //   npm run research -- --dry-run         fetch data and build prompts, no Claude calls
-//   npm run research -- --symbols AAPL,MSFT --limit 2
+//   npm run research -- --symbols AAPL,MSFT --limit 2   (skips discovery)
+//   npm run research -- --no-discovery    watchlist only, no wider scan
 //   npm run research -- --as-of 2025-03-03 --limit 3
 //       research as if it were that morning; saved apart from live runs
 //       and marked, because the model may remember what came next
@@ -39,6 +40,7 @@ const edgar = new Edgar(secrets.secUserAgent, config.paths.edgarCacheDirectory);
 const sources: RunSources = {
   dailyBars: (list, start, end) => fetchDailyBars(alpaca, list, start, end),
   news: (symbol, start, end, max) => fetchNews(alpaca, [symbol], start, end, max),
+  recentNews: (list, start, end, max) => fetchNews(alpaca, list, start, end, max),
   company: (symbol) => edgar.lookup(symbol),
   filings: (cik, since, asOfDate) => edgar.recentFilings(cik, since, asOfDate),
   facts: (cik, asOfDate, quarters) => edgar.quarterlyFacts(cik, asOfDate, quarters),
@@ -59,6 +61,7 @@ const runOptions: Parameters<typeof runResearch>[3] = {
 };
 if (symbols && symbols.length > 0) runOptions.symbols = symbols;
 if (limit !== undefined) runOptions.limit = limit;
+if (args.has('no-discovery')) runOptions.discover = false;
 
 const result = await runResearch(config, sources, writer, runOptions);
 
@@ -82,6 +85,7 @@ await writeFile(
       budgetUsd: result.budgetUsd,
       tokens: result.tokens,
       skipped: result.skipped,
+      discovery: result.discovery,
       watchlist: result.rows,
     },
     null,

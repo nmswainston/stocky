@@ -94,6 +94,7 @@ function thesisCard(thesis) {
   const title = make('h3', { attrs: { id: headingId } }, [
     document.createTextNode(thesis.symbol),
     thesis.companyName ? make('span', { className: 'company', text: ` ${thesis.companyName}` }) : null,
+    thesis.discovered ? make('span', { className: 'badge', text: 'New find' }) : null,
   ]);
   const score = make('p', { className: `score ${tone(thesis.score)}` }, [
     make('span', { className: 'score-num', text: signed(thesis.score) }),
@@ -154,6 +155,7 @@ function renderWatchlist(day) {
   for (const row of day.watchlist) {
     const name = make('th', { attrs: { scope: 'row' } }, [
       document.createTextNode(row.symbol),
+      row.discovered ? make('span', { className: 'badge', text: 'New' }) : null,
       row.dataProblems.length > 0 ? make('span', { className: 'warn', text: ' !', attrs: { title: row.dataProblems.join('; '), 'aria-label': `data problem: ${row.dataProblems.join('; ')}` } }) : null,
     ]);
     body.append(make('tr', {}, [
@@ -178,6 +180,27 @@ function renderWatchlist(day) {
   }
 }
 
+// Names the morning scan added from beyond the watchlist, with why.
+function renderFinds(day) {
+  const section = $('finds-section');
+  const list = $('finds');
+  list.replaceChildren();
+  const scan = day.discovery;
+  if (!scan) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  const found = day.watchlist.filter((row) => row.discovered);
+  $('finds-meta').textContent = found.length > 0
+    ? `Added from a scan of ${scan.scanned} large US stocks beyond your watchlist. Marked New in the table below.`
+    : `Scanned ${scan.scanned} large US stocks beyond your watchlist. Nothing unusual enough to add today.`;
+  for (const row of found) {
+    const status = row.researched ? 'researched above' : 'not researched today';
+    list.append(make('li', { text: `${row.symbol}: ${row.discoveryReason ?? 'unusual activity'}, ${status}.` }));
+  }
+}
+
 async function loadDay(date) {
   $('run-meta').textContent = 'Loading...';
   const response = await fetch(`/api/research/${encodeURIComponent(date)}`, { cache: 'no-store' });
@@ -188,6 +211,7 @@ async function loadDay(date) {
   const day = await response.json();
   renderMeta(day);
   renderTheses(day);
+  renderFinds(day);
   renderWatchlist(day);
   const url = new URL(location.href);
   url.searchParams.set('date', date);

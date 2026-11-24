@@ -46,6 +46,8 @@ export interface ThesisView {
   return20d: number | null;
   vsBenchmark20d: number | null;
   sources: Citation[];
+  // Found by the wider scan rather than the watchlist.
+  discovered: boolean;
 }
 
 export interface WatchView {
@@ -58,6 +60,14 @@ export interface WatchView {
   interest: number;
   researched: boolean;
   dataProblems: string[];
+  discovered: boolean;
+  discoveryReason: string | null;
+}
+
+export interface DiscoveryView {
+  scanned: number;
+  liquid: number;
+  added: string[];
 }
 
 export interface ResearchDay {
@@ -69,8 +79,13 @@ export interface ResearchDay {
   budgetUsd: number | null;
   theses: ThesisView[];
   watchlist: WatchView[];
+  // Null for days saved before discovery existed, or with it switched off.
+  discovery: DiscoveryView | null;
   skipped: { symbol: string; reason: string }[];
 }
+
+// Older run.json files have no discovery fields; they read as watchlist only.
+type SavedRow = Omit<WatchRow, 'discovered' | 'discoveryReason'> & Partial<Pick<WatchRow, 'discovered' | 'discoveryReason'>>;
 
 interface RunFile {
   asOf?: string;
@@ -79,7 +94,8 @@ interface RunFile {
   costUsd?: number;
   budgetUsd?: number;
   skipped?: { symbol: string; reason: string }[];
-  watchlist?: WatchRow[];
+  watchlist?: SavedRow[];
+  discovery?: { scanned?: number; liquid?: number; added?: string[] } | null;
 }
 
 async function readJson<T>(file: string): Promise<T | null> {
@@ -101,7 +117,7 @@ function safeUrl(url: string | undefined): string | null {
   }
 }
 
-function thesisView(thesis: Thesis, snapshot: Snapshot | undefined): ThesisView {
+function thesisView(thesis: Thesis, snapshot: Snapshot | undefined, discovered: boolean): ThesisView {
   const known = new Map<string, SourceRef>((snapshot?.sources ?? []).map((source) => [source.id, source]));
   const sources: Citation[] = [];
   const numberOf = new Map<string, number>();
@@ -138,10 +154,11 @@ function thesisView(thesis: Thesis, snapshot: Snapshot | undefined): ThesisView 
     return20d: features?.return20d ?? null,
     vsBenchmark20d: features?.vsBenchmark20d ?? null,
     sources,
+    discovered,
   };
 }
 
-function watchView(row: WatchRow): WatchView {
+function watchView(row: SavedRow): WatchView {
   return {
     symbol: row.symbol,
     companyName: row.companyName,
@@ -152,6 +169,8 @@ function watchView(row: WatchRow): WatchView {
     interest: row.interest,
     researched: row.researched,
     dataProblems: row.dataProblems,
+    discovered: row.discovered === true,
+    discoveryReason: row.discovered === true ? (row.discoveryReason ?? null) : null,
   };
 }
 
@@ -192,6 +211,8 @@ export async function readResearchDay(directory: string, date: string): Promise<
   const theses = (await readJson<Thesis[]>(path.join(folder, 'theses.json'))) ?? [];
   const snapshots = (await readJson<Snapshot[]>(path.join(folder, 'snapshots.json'))) ?? [];
   const bySymbol = new Map(snapshots.map((snapshot) => [snapshot.symbol, snapshot]));
+  const found = new Set((run.watchlist ?? []).filter((row) => row.discovered === true).map((row) => row.symbol));
+  const scan = run.discovery;
   return {
     date,
     asOf: run.asOf ?? null,
@@ -200,9 +221,12 @@ export async function readResearchDay(directory: string, date: string): Promise<
     costUsd: run.costUsd ?? null,
     budgetUsd: run.budgetUsd ?? null,
     theses: theses
-      .map((thesis) => thesisView(thesis, bySymbol.get(thesis.symbol)))
+      .map((thesis) => thesisView(thesis, bySymbol.get(thesis.symbol), found.has(thesis.symbol)))
       .sort((a, b) => b.score - a.score || a.symbol.localeCompare(b.symbol)),
     watchlist: (run.watchlist ?? []).map(watchView),
+    discovery: scan
+      ? { scanned: scan.scanned ?? 0, liquid: scan.liquid ?? 0, added: Array.isArray(scan.added) ? scan.added : [] }
+      : null,
     skipped: run.skipped ?? [],
   };
 }

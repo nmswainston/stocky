@@ -39,7 +39,7 @@ the collector runs.
 | `npm run reconcile -- --id <session-id>` | Prove a paper session and a backtest over the same bars are identical |
 | `npm run digest -- --date YYYY-MM-DD` | Write the markdown daily digest (defaults to yesterday UTC; a systemd timer runs it nightly) |
 | `npm run walkforward -- --strategy sma --fast 5 --slow 20 --timeframe 60 --folds 4` | Test the same fixed strategy independently across contiguous folds of history; repeatability, not curve fit |
-| `npm run research` | Stock research digest: Claude writes a cited thesis on the day's most active watchlist names. Research only, no orders (`--dry-run` to skip Claude, `--symbols AAPL,MSFT --limit 2` to narrow it) |
+| `npm run research` | Stock research digest: Claude writes a cited thesis on the day's most active watchlist names plus any new finds from a wider scan. Research only, no orders (`--dry-run` to skip Claude, `--symbols AAPL,MSFT --limit 2` to narrow it, `--no-discovery` for the watchlist alone) |
 | `npm run research:backtest -- --from 2023-01-01 --every 5 --hold 20 --top 5` | Replay past prices: does the screen find movers, and does a plain rule score beat SPY? No Claude calls |
 | `npm run research:scorecard -- --horizon 20` | Grade saved theses against what happened next, by score, versus SPY |
 | `npm test` | Vitest suite |
@@ -136,7 +136,9 @@ appears in the module.
 ```
 Alpaca market data (bars, news) + SEC EDGAR (filings, XBRL facts)
         |
-   collect: daily bars for the watchlist + SPY, 7 days of news, 120 days of filings
+   discover: scan about 100 more large US stocks, add up to 3 with unusual moves, volume, news or 8-Ks
+        |
+   collect: daily bars for the watchlist, new finds + SPY, 7 days of news, 120 days of filings
         |
    screen: plain math ranks unusual moves, volume, news and fresh 10-Q/10-K filings
         |
@@ -178,6 +180,36 @@ The rules that keep it honest:
    below. It is read only, works on a phone, and follows the phone's
    light or dark mode.
 
+### Discovery (new finds)
+
+The watchlist is only what you already know about, so each run first
+scans a wider list of large US stocks (about 100, roughly the S&P 100,
+in `src/research/universe.ts`) for the few where something happened:
+
+- **Large and liquid only.** A name needs a last close of at least $10,
+  steady daily trading, and a bar in the last week. No penny stocks,
+  nothing halted or delisted.
+- **Same yardstick as the watchlist.** It uses the same interest score:
+  the size of the 5 day move against the stock's normal noise, volume
+  against its 20 day average, fresh news stories and fresh 8-K, 10-Q or
+  10-K filings. Only names scoring 2 or more qualify, so a quiet day adds
+  nothing.
+- **Up to 3 a day** join the day's list, marked "new find" in the digest
+  and "New" on the phone page, each with the reason it was picked.
+- **No extra Claude spend.** New finds compete with the watchlist for
+  the same 8 daily theses and the same $0.75 cap. A fresh 10-Q forces a
+  look only for watchlist names, so earnings season elsewhere cannot
+  crowd out the names you chose.
+- **Light on the free data limits.** Prices go in batches of 50 symbols,
+  news is one bulk query, and SEC filings are checked only for the 25
+  busiest names (paced and cached by the EDGAR client).
+
+Settings, all optional in `.env`: `RESEARCH_DISCOVERY=off` turns it off,
+`RESEARCH_DISCOVERY_ADD=3` sets how many to add,
+`RESEARCH_DISCOVERY_MIN_INTEREST=2` sets the bar, and
+`STOCKY_DISCOVERY_UNIVERSE=...` replaces the list (for example with the
+whole S&P 500). A `--symbols` run skips discovery.
+
 ### Backtest and scorecard
 
 Two honest ways to check the research, neither of which spends on Claude:
@@ -201,7 +233,7 @@ the pipeline on past dates; those runs are saved under
 The watchlist is today's large caps, picked with hindsight
 (survivorship bias), so every backtest on it flatters the strategy.
 
-Defaults: 20 large US stocks, 8 researched a day, Claude Sonnet 5.5,
+Defaults: 20 large US stocks plus up to 3 new finds, 8 researched a day, Claude Sonnet 5.5,
 $0.75 a day cap (roughly $5 to $15 a month in practice). All settings
 are in `src/research/config.ts` and can be overridden in `.env`.
 

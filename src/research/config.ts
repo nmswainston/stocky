@@ -2,6 +2,8 @@
 // Research only: nothing in src/research can place, change or cancel
 // an order. The guard test in no-orders.test.ts keeps it that way.
 
+import { LARGE_CAP_UNIVERSE } from './universe.js';
+
 const DEFAULT_WATCHLIST = [
   'AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL',
   'META', 'AVGO', 'TSLA', 'JPM', 'V',
@@ -16,6 +18,14 @@ function listFromEnv(name: string): string[] | null {
     .split(',')
     .map((symbol) => symbol.trim().toUpperCase())
     .filter((symbol) => symbol.length > 0);
+}
+
+function switchFromEnv(name: string, fallback: boolean): boolean {
+  const raw = process.env[name]?.trim().toLowerCase();
+  if (raw === undefined || raw === '') return fallback;
+  if (['on', 'true', 'yes', '1'].includes(raw)) return true;
+  if (['off', 'false', 'no', '0'].includes(raw)) return false;
+  throw new Error(`${name} must be on or off, got ${process.env[name]}`);
 }
 
 function numberFromEnv(name: string, fallback: number): number {
@@ -40,6 +50,32 @@ export function researchConfig() {
     // Hard daily cap on Claude spend, in US dollars. Research stops for
     // the day once the next call could cross it.
     dailyBudgetUsd: numberFromEnv('RESEARCH_DAILY_BUDGET_USD', 0.75),
+    // Before the daily pick, scan a wider list of large US stocks and add
+    // the few where something unusual happened. Discovered names compete
+    // for the same researchPerDay slots and the same daily budget, so
+    // discovery never raises the Claude bill past the cap.
+    discovery: {
+      enabled: switchFromEnv('RESEARCH_DISCOVERY', true),
+      // At most this many discovered names join the day's list.
+      add: Math.round(numberFromEnv('RESEARCH_DISCOVERY_ADD', 3)),
+      universe: listFromEnv('STOCKY_DISCOVERY_UNIVERSE') ?? LARGE_CAP_UNIVERSE,
+      // No penny stocks: last close at least this many dollars.
+      minPrice: 10,
+      // Average daily dollar volume over 20 sessions, as seen on Alpaca's
+      // free IEX feed. IEX carries only a few percent of all US trading,
+      // so $2M there is roughly $50M or more across the whole market.
+      minDollarVolume: 2_000_000,
+      // Same scale as the watchlist's interest score. 2 is about a two
+      // sigma five day move, or a smaller move with heavy volume and news.
+      minInterest: numberFromEnv('RESEARCH_DISCOVERY_MIN_INTEREST', 2),
+      // SEC filing checks per run, on the names already looking busiest.
+      // Keeps EDGAR traffic small; each answer is cached for 20 hours.
+      secChecks: 25,
+      // Cap on the one bulk news query across the whole liquid list.
+      newsItems: 200,
+      // Alpaca bars requests carry at most this many symbols.
+      batchSize: 50,
+    },
     model: process.env.RESEARCH_MODEL ?? 'claude-sonnet-5-5',
     effort: 'medium' as const,
     maxOutputTokens: 6_000,

@@ -137,6 +137,31 @@ describe('research library', () => {
     expect(day).not.toBeNull();
   });
 
+  it('marks new finds and reads older days as watchlist only', async () => {
+    const old = await readResearchDay(directory, '2026-09-01');
+    expect(old?.discovery).toBeNull();
+    expect(old?.watchlist[0]?.discovered).toBe(false);
+    expect(old?.theses.every((item) => item.discovered === false)).toBe(true);
+
+    const rows = [
+      { symbol: 'AAA', companyName: 'AAA Inc.', features: null, interest: 1, newNews: 0, newFilings: [], researched: false, dataProblems: [], discovered: false, discoveryReason: null },
+      { symbol: 'NEW', companyName: 'New Co', features: null, interest: 4, newNews: 3, newFilings: ['8-K'], researched: true, dataProblems: [], discovered: true, discoveryReason: '5 day move +9.0%' },
+    ];
+    await writeDay(
+      '2026-09-03',
+      { dryRun: false, watchlist: rows, discovery: { scanned: 100, liquid: 96, secChecked: 25, added: ['NEW'], problems: [] } },
+      [thesis('NEW', 2)],
+      [snapshot('NEW')],
+    );
+    const day = await readResearchDay(directory, '2026-09-03');
+    expect(day?.discovery).toEqual({ scanned: 100, liquid: 96, added: ['NEW'] });
+    expect(day?.theses[0]?.discovered).toBe(true);
+    expect(day?.watchlist.map((row) => [row.symbol, row.discovered, row.discoveryReason])).toEqual([
+      ['AAA', false, null],
+      ['NEW', true, '5 day move +9.0%'],
+    ]);
+  });
+
   it('refuses anything that is not a date', async () => {
     expect(await readResearchDay(directory, '../etc')).toBeNull();
     expect(await readResearchDay(directory, '2026-01-01')).toBeNull();
@@ -185,7 +210,7 @@ describe('research API routes', () => {
 
   it('serves the day list and one day', async () => {
     const list = (await (await fetch(`${base}/api/research`)).json()) as { days: { date: string }[] };
-    expect(list.days[0]?.date).toBe('2026-09-02');
+    expect(list.days[0]?.date).toBe('2026-09-03');
     const day = await fetch(`${base}/api/research/2026-09-01`);
     expect(day.status).toBe(200);
     expect(((await day.json()) as { theses: unknown[] }).theses).toHaveLength(2);

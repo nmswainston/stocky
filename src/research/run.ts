@@ -1,6 +1,7 @@
 import type { ThesisWriter } from './agent.js';
 import type { ResearchConfig } from './config.js';
 import { Budget, estimateTokens } from './cost.js';
+import { discover, type DiscoveryResult } from './discovery.js';
 import { interestScore, pickForResearch } from './features.js';
 import { snapshotForPrompt, SYSTEM_PROMPT } from './prompt.js';
 import { buildSnapshot } from './snapshot.js';
@@ -17,6 +18,8 @@ export interface RunSources {
   company(symbol: string): Promise<{ cik: number; title: string } | null>;
   filings(cik: number, sinceDate: string, asOfDate: string): Promise<Filing[]>;
   facts(cik: number, asOfDate: string, quarters: number): Promise<QuarterFact[]>;
+  // One news query across many symbols, used only by discovery.
+  recentNews?(symbols: string[], startIso: string, endIso: string, max: number): Promise<NewsItem[]>;
 }
 
 export interface WatchRow {
@@ -28,6 +31,17 @@ export interface WatchRow {
   newFilings: string[];
   researched: boolean;
   dataProblems: string[];
+  // True for names found by the wider scan rather than the watchlist.
+  discovered: boolean;
+  discoveryReason: string | null;
+}
+
+export interface DiscoverySummary {
+  scanned: number;
+  liquid: number;
+  secChecked: number;
+  added: string[];
+  problems: string[];
 }
 
 export interface RunResult {
@@ -40,6 +54,8 @@ export interface RunResult {
   tokens: { input: number; output: number };
   benchmark: { symbol: string; features: Features | null };
   rows: WatchRow[];
+  // Null when discovery was off for this run.
+  discovery: DiscoverySummary | null;
   theses: Thesis[];
   skipped: { symbol: string; reason: string }[];
   snapshots: Snapshot[];
@@ -65,20 +81,35 @@ export async function runResearch(
   config: ResearchConfig,
   sources: RunSources,
   writer: ThesisWriter | null,
-  options: { now: Date; symbols?: string[]; limit?: number; log?: (line: string) => void },
+  options: { now: Date; symbols?: string[]; limit?: number; discover?: boolean; log?: (line: string) => void },
 ): Promise<RunResult> {
   const log = options.log ?? (() => {});
   const { now } = options;
   const asOf = now.toISOString();
   const asOfDate = asOf.slice(0, 10);
-  const symbols = options.symbols ?? config.watchlist;
+  const watchlist = options.symbols ?? config.watchlist;
+  // A hand-picked --symbols run is a narrow test, so it skips discovery.
+  const discoveryOn = options.discover ?? (config.discovery.enabled && options.symbols === undefined);
   const h = config.history;
   const recentNewsCutoff = daysBefore(now, 1.5);
   const recentFilingCutoff = daysBefore(now, 3).slice(0, 10);
 
-  log(`collecting daily bars for ${symbols.length} symbols plus ${config.benchmark}`);
-  const allBars = await sources.dailyBars([...symbols, config.benchmark], daysBefore(now, h.barDays).slice(0, 10), asOf);
+  log(`collecting daily bars for ${watchlist.length} symbols plus ${config.benchmark}`);
+  const allBars = await sources.dailyBars([...watchlist, config.benchmark], daysBefore(now, h.barDays).slice(0, 10), asOf);
   const benchmarkBars = allBars.get(config.benchmark) ?? [];
+
+  let discovery: DiscoveryResult | null = null;
+  if (discoveryOn) {
+    discovery = await discover(config, sources, {
+      now,
+      exclude: [...watchlist, config.benchmark],
+      benchmarkBars,
+      log,
+    });
+    for (const item of discovery.added) allBars.set(item.symbol, discovery.bars.get(item.symbol) ?? []);
+  }
+  const discoveredReasons = new Map((discovery?.added ?? []).map((item) => [item.symbol, item.reason]));
+  const symbols = [...watchlist, ...discoveredReasons.keys()];
 
   const snapshots: Snapshot[] = [];
   const rows: WatchRow[] = [];
@@ -130,6 +161,8 @@ export async function runResearch(
       newFilings,
       researched: false,
       dataProblems: snapshot.dataProblems,
+      discovered: discoveredReasons.has(symbol),
+      discoveryReason: discoveredReasons.get(symbol) ?? null,
     });
   }
 
@@ -139,8 +172,10 @@ export async function runResearch(
       .map((row) => ({
         symbol: row.symbol,
         score: row.interest,
-        // A fresh quarterly or annual report always earns a look.
-        mustResearch: row.newFilings.some((form) => form.startsWith('10-')),
+        // A fresh quarterly or annual report on a watchlist name always
+        // earns a look. Discovered names compete on score, so earnings
+        // season elsewhere cannot crowd out the names you chose.
+        mustResearch: !row.discovered && row.newFilings.some((form) => form.startsWith('10-')),
       })),
     options.limit ?? config.researchPerDay,
   );
@@ -204,6 +239,15 @@ export async function runResearch(
     tokens,
     benchmark: { symbol: config.benchmark, features: benchmarkSnapshot.features },
     rows,
+    discovery: discovery
+      ? {
+          scanned: discovery.scanned,
+          liquid: discovery.liquid,
+          secChecked: discovery.secChecked,
+          added: discovery.added.map((item) => item.symbol),
+          problems: discovery.problems,
+        }
+      : null,
     theses,
     skipped,
     snapshots,

@@ -1,0 +1,206 @@
+/* Stock research page. Phone first: one readable column, large tap
+   targets, light or dark to match the phone. Up and down use a sign
+   as well as a color, so color is never the only signal. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #f6f7f9;
+  --card: #ffffff;
+  --text: #1b1f24;
+  --muted: #57606a;
+  --line: #d0d7de;
+  --accent: #0b5cad;
+  --up: #116329;
+  --down: #b3261e;
+  --warn-bg: #fff4d6;
+  --warn-text: #6b4a00;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1116;
+    --card: #161b22;
+    --text: #e6edf3;
+    --muted: #9da7b1;
+    --line: #30363d;
+    --accent: #79b8ff;
+    --up: #56d364;
+    --down: #ff7b72;
+    --warn-bg: #3a2d0a;
+    --warn-text: #f2cc60;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 1rem/1.55 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-text-size-adjust: 100%;
+}
+
+a { color: var(--accent); }
+a:focus-visible, select:focus-visible, summary:focus-visible, .table-wrap:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.skip {
+  position: absolute;
+  left: -999px;
+  top: 0.5rem;
+  background: var(--card);
+  padding: 0.5rem 0.75rem;
+  z-index: 10;
+}
+.skip:focus { left: 0.5rem; }
+
+.top, main, .foot {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.top {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+h1 { font-size: 1.3rem; margin: 0; }
+h2 { font-size: 1.15rem; margin: 1.75rem 0 0.25rem; }
+h3 { font-size: 1.1rem; margin: 0; }
+h4 { font-size: 0.95rem; margin: 0.9rem 0 0.25rem; color: var(--muted); }
+
+nav a {
+  display: inline-block;
+  padding: 0.6rem 0;
+  min-height: 44px;
+}
+
+.day-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+.day-picker select {
+  flex: 1;
+  min-height: 44px;
+  font: inherit;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+}
+
+.note {
+  margin: 1rem 0 0;
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  font-size: 0.9rem;
+}
+
+.meta, .hint, .facts, .company, .empty, .foot { color: var(--muted); }
+.meta { margin: 0.75rem 0 0; }
+.hint { margin: 0 0 0.75rem; font-size: 0.9rem; }
+
+.thesis {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.thesis header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+}
+.company { font-weight: 400; font-size: 0.95rem; }
+
+.score { margin: 0; font-size: 0.95rem; }
+.score-num {
+  font-weight: 700;
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary { margin: 0.6rem 0 0; }
+.facts { margin: 0.4rem 0 0; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+
+.points { margin: 0; padding-left: 1.2rem; }
+.points li { margin-bottom: 0.35rem; }
+
+.cites sup { margin-left: 0.1rem; }
+.cites a {
+  display: inline-block;
+  min-width: 1.6rem;
+  padding: 0.1rem 0.25rem;
+  text-align: center;
+  text-decoration: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 0.75rem;
+}
+
+.watch { margin: 0.8rem 0 0; }
+.flag {
+  margin: 0.8rem 0 0;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  font-size: 0.9rem;
+}
+
+details { margin-top: 0.8rem; }
+summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--accent);
+}
+.sources { margin: 0; padding-left: 1.6rem; font-size: 0.9rem; overflow-wrap: anywhere; }
+.sources li { margin-bottom: 0.35rem; }
+.sources li:target { background: var(--warn-bg); }
+
+.up { color: var(--up); }
+.down { color: var(--down); }
+.warn { color: var(--down); font-weight: 700; }
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+th, td { padding: 0.55rem 0.6rem; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+tbody tr:last-child th, tbody tr:last-child td { border-bottom: none; }
+thead th { color: var(--muted); font-weight: 600; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+#skipped h3 { margin-top: 1rem; font-size: 1rem; }
+#skipped ul { padding-left: 1.2rem; color: var(--muted); }
+
+.foot { padding-top: 1.5rem; padding-bottom: 2rem; font-size: 0.85rem; }
+
+@media (min-width: 48rem) {
+  .day-picker select { flex: 0 1 18rem; }
+}

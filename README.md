@@ -172,6 +172,11 @@ The rules that keep it honest:
    (about 4 cents on Claude Sonnet 5.5).
 4. Daily: install `scripts/stocky-research.service` and `.timer` (runs
    weekdays at 12:30 UTC, 5:30 AM in Phoenix).
+5. Read it: open `/research.html` on the dashboard (linked from the
+   header). One card per thesis with its score, the points for and
+   against, and numbered sources you can tap; the watchlist table sits
+   below. It is read only, works on a phone, and follows the phone's
+   light or dark mode.
 
 ### Backtest and scorecard
 

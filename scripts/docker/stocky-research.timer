@@ -1,0 +1,12 @@
+# Weekdays at 12:30 UTC: 5:30 AM in Phoenix all year, before the US open
+# (7:30 AM Phoenix in winter, 6:30 AM in summer).
+
+[Unit]
+Description=stocky stock research digest timer (Docker)
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 12:30:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

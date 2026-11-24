@@ -1,0 +1,212 @@
+import type { ThesisWriter } from './agent.js';
+import type { ResearchConfig } from './config.js';
+import { Budget, estimateTokens } from './cost.js';
+import { interestScore, pickForResearch } from './features.js';
+import { snapshotForPrompt, SYSTEM_PROMPT } from './prompt.js';
+import { buildSnapshot } from './snapshot.js';
+import { validateThesis } from './thesis.js';
+import type { DailyBar, Features, Filing, NewsItem, QuarterFact, Snapshot, Thesis } from './types.js';
+
+// One research run: collect, screen, research, validate. Every outside
+// call comes in through RunSources so tests run offline, and nothing in
+// here can reach a broker.
+
+export interface RunSources {
+  dailyBars(symbols: string[], startDate: string, endIso: string): Promise<Map<string, DailyBar[]>>;
+  news(symbol: string, startIso: string, endIso: string, max: number): Promise<NewsItem[]>;
+  company(symbol: string): Promise<{ cik: number; title: string } | null>;
+  filings(cik: number, sinceDate: string, asOfDate: string): Promise<Filing[]>;
+  facts(cik: number, asOfDate: string, quarters: number): Promise<QuarterFact[]>;
+}
+
+export interface WatchRow {
+  symbol: string;
+  companyName: string | null;
+  features: Features | null;
+  interest: number;
+  newNews: number;
+  newFilings: string[];
+  researched: boolean;
+  dataProblems: string[];
+}
+
+export interface RunResult {
+  marketDate: string;
+  asOf: string;
+  model: string;
+  dryRun: boolean;
+  budgetUsd: number;
+  costUsd: number;
+  tokens: { input: number; output: number };
+  benchmark: { symbol: string; features: Features | null };
+  rows: WatchRow[];
+  theses: Thesis[];
+  skipped: { symbol: string; reason: string }[];
+  snapshots: Snapshot[];
+  prompts: { symbol: string; prompt: string; estimatedTokens: number }[];
+}
+
+const DAY_MS = 86_400_000;
+
+export function marketDateOf(now: Date): string {
+  // en-CA formats as YYYY-MM-DD.
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(now);
+}
+
+function message(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function daysBefore(now: Date, days: number): string {
+  return new Date(now.getTime() - days * DAY_MS).toISOString();
+}
+
+export async function runResearch(
+  config: ResearchConfig,
+  sources: RunSources,
+  writer: ThesisWriter | null,
+  options: { now: Date; symbols?: string[]; limit?: number; log?: (line: string) => void },
+): Promise<RunResult> {
+  const log = options.log ?? (() => {});
+  const { now } = options;
+  const asOf = now.toISOString();
+  const asOfDate = asOf.slice(0, 10);
+  const symbols = options.symbols ?? config.watchlist;
+  const h = config.history;
+  const recentNewsCutoff = daysBefore(now, 1.5);
+  const recentFilingCutoff = daysBefore(now, 3).slice(0, 10);
+
+  log(`collecting daily bars for ${symbols.length} symbols plus ${config.benchmark}`);
+  const allBars = await sources.dailyBars([...symbols, config.benchmark], daysBefore(now, h.barDays).slice(0, 10), asOf);
+  const benchmarkBars = allBars.get(config.benchmark) ?? [];
+
+  const snapshots: Snapshot[] = [];
+  const rows: WatchRow[] = [];
+  for (const symbol of symbols) {
+    const problems: string[] = [];
+    let news: NewsItem[] = [];
+    let filings: Filing[] = [];
+    let facts: QuarterFact[] = [];
+    let companyName: string | null = null;
+    try {
+      news = await sources.news(symbol, daysBefore(now, h.newsDays), asOf, h.newsPerSymbol);
+    } catch (error) {
+      problems.push(`news unavailable: ${message(error)}`);
+    }
+    try {
+      const company = await sources.company(symbol);
+      if (company) {
+        companyName = company.title;
+        filings = await sources.filings(company.cik, daysBefore(now, h.filingDays).slice(0, 10), asOfDate);
+        facts = await sources.facts(company.cik, asOfDate, h.quarters);
+      } else {
+        problems.push('not found in SEC ticker list');
+      }
+    } catch (error) {
+      problems.push(`SEC data unavailable: ${message(error)}`);
+    }
+    const snapshot = buildSnapshot({
+      symbol,
+      companyName,
+      asOf,
+      bars: allBars.get(symbol) ?? [],
+      benchmarkBars,
+      news,
+      filings,
+      facts,
+      dataProblems: problems,
+    });
+    snapshots.push(snapshot);
+    const newNews = snapshot.news.filter((item) => item.createdAt >= recentNewsCutoff).length;
+    const newFilings = snapshot.filings
+      .filter((filing) => filing.filedOn >= recentFilingCutoff)
+      .map((filing) => filing.form);
+    rows.push({
+      symbol,
+      companyName,
+      features: snapshot.features,
+      interest: interestScore({ features: snapshot.features, newNewsCount: newNews, newFilingForms: newFilings }),
+      newNews,
+      newFilings,
+      researched: false,
+      dataProblems: snapshot.dataProblems,
+    });
+  }
+
+  const picked = pickForResearch(
+    rows
+      .filter((row) => row.features !== null)
+      .map((row) => ({
+        symbol: row.symbol,
+        score: row.interest,
+        // A fresh quarterly or annual report always earns a look.
+        mustResearch: row.newFilings.some((form) => form.startsWith('10-')),
+      })),
+    options.limit ?? config.researchPerDay,
+  );
+  log(`screen picked ${picked.join(', ') || 'nothing'}`);
+
+  const budget = new Budget(config.dailyBudgetUsd, config.model);
+  const theses: Thesis[] = [];
+  const skipped: RunResult['skipped'] = [];
+  const prompts: RunResult['prompts'] = [];
+  const tokens = { input: 0, output: 0 };
+  const systemTokens = estimateTokens(SYSTEM_PROMPT);
+
+  for (const symbol of picked) {
+    const snapshot = snapshots.find((item) => item.symbol === symbol) as Snapshot;
+    const prompt = snapshotForPrompt(snapshot);
+    const estimatedTokens = systemTokens + estimateTokens(prompt);
+    prompts.push({ symbol, prompt, estimatedTokens });
+    if (!writer) continue; // dry run: build prompts, call nothing
+    if (!budget.canAfford(estimatedTokens, config.maxOutputTokens)) {
+      skipped.push({ symbol, reason: `daily budget of $${config.dailyBudgetUsd.toFixed(2)} reached` });
+      continue;
+    }
+    try {
+      log(`researching ${symbol}`);
+      const reply = await writer.write(prompt);
+      const cost = budget.record(reply.usage);
+      tokens.input += reply.usage.input_tokens;
+      tokens.output += reply.usage.output_tokens;
+      const thesis = validateThesis(reply.json, snapshot);
+      if (reply.json === null) {
+        thesis.problems.unshift(`no usable answer (stop reason ${reply.stopReason ?? 'unknown'})`);
+        thesis.verified = false;
+      }
+      theses.push(thesis);
+      const row = rows.find((item) => item.symbol === symbol);
+      if (row) row.researched = true;
+      log(`${symbol}: score ${thesis.score}, ${thesis.confidence} confidence, $${cost.toFixed(4)}`);
+    } catch (error) {
+      skipped.push({ symbol, reason: `Claude call failed: ${message(error)}` });
+    }
+  }
+
+  const benchmarkSnapshot = buildSnapshot({
+    symbol: config.benchmark,
+    companyName: null,
+    asOf,
+    bars: benchmarkBars,
+    benchmarkBars: [],
+    news: [],
+    filings: [],
+    facts: [],
+  });
+
+  return {
+    marketDate: marketDateOf(now),
+    asOf,
+    model: config.model,
+    dryRun: writer === null,
+    budgetUsd: config.dailyBudgetUsd,
+    costUsd: budget.spent,
+    tokens,
+    benchmark: { symbol: config.benchmark, features: benchmarkSnapshot.features },
+    rows,
+    theses,
+    skipped,
+    snapshots,
+    prompts,
+  };
+}

@@ -32,3 +32,47 @@ export const LARGE_CAP_UNIVERSE = [
   // Utilities, real estate, materials
   'NEE', 'DUK', 'SO', 'LIN', 'AMT', 'PLD',
 ];
+
+// Smaller, lesser-known US names for RESEARCH_UNIVERSE=small or both:
+// roughly 200 small and mid caps, curated for liquidity and spread
+// across sectors. A point-in-time list (late 2025): names get acquired,
+// delisted or outgrow the label, and that is fine, because a symbol
+// with no recent bars is skipped, never an error. Same exclusions as
+// above: no dotted tickers, no foreign filers.
+
+export const SMALL_CAP_UNIVERSE = [
+  // Semiconductors and hardware
+  'ACLS', 'AMBA', 'ALGM', 'CRUS', 'DIOD', 'FORM', 'LSCC', 'MTSI', 'ONTO', 'PLAB',
+  'POWI', 'RMBS', 'SITM', 'SLAB', 'SMTC', 'SYNA', 'VECO', 'COHU', 'ICHR', 'KLIC',
+  'UCTT', 'ACMR',
+  // Software and internet
+  'AGYS', 'ALRM', 'ASAN', 'BL', 'BOX', 'BRZE', 'DOCN', 'ENV', 'FIVN', 'FRSH',
+  'INTA', 'JAMF', 'NCNO', 'PD', 'PRGS', 'QLYS', 'RPD', 'SPSC', 'SPT', 'TENB',
+  'WK', 'CWAN', 'ZD', 'YELP', 'TRIP', 'UPWK', 'CARG', 'CARS', 'EB',
+  'QNST', 'BMBL', 'GRPN', 'REAL', 'LZ',
+  // Consumer and restaurants
+  'AEO', 'ANF', 'BJRI', 'BOOT', 'CAKE', 'CBRL', 'COLM', 'CROX', 'DENN', 'DIN',
+  'GIII', 'JACK', 'KTB', 'OXM', 'PLAY', 'SHAK', 'SG', 'SONO', 'LESL', 'OLPX',
+  'PTON', 'WWW', 'YETI', 'WING',
+  // Industrials
+  'AAON', 'ABM', 'AGX', 'ALG', 'ATKR', 'AZZ', 'CSWI', 'EPAC', 'FELE', 'GVA',
+  'HLIO', 'IESC', 'KAI', 'MWA', 'NPO', 'PRIM', 'ROAD', 'STRL', 'TPC', 'POWL',
+  'SPXC', 'WTS', 'MLI', 'MYRG',
+  // Financials: banks, insurers, fintech
+  'ABCB', 'AUB', 'BANF', 'CADE', 'COLB', 'CVBF', 'FFIN', 'FHB', 'GBCI', 'HOMB',
+  'HWC', 'ONB', 'OZK', 'SFNC', 'SSB', 'TBBK', 'WSFS', 'AX', 'ENVA', 'LC',
+  'NAVI', 'TREE', 'VIRT', 'BGC', 'PJT', 'PIPR', 'HLI', 'PLMR', 'THG', 'AMSF',
+  'TRUP', 'GSHD', 'ESNT', 'NMIH', 'RDN', 'UPST',
+  // Health care: biotech, devices, services
+  'ACAD', 'AMPH', 'ARWR', 'CORT', 'CPRX', 'DVAX', 'FOLD', 'IRWD', 'LGND', 'MYGN',
+  'PCRX', 'PTCT', 'SUPN', 'VCEL', 'XENE', 'OMCL', 'NEOG', 'PGNY', 'ADUS', 'PNTG',
+  'LFST', 'EVH', 'RDNT', 'SDGR', 'TWST', 'PACB', 'CDNA', 'ATEC', 'SIBN',
+  'BLFS', 'TNDM', 'LNTH', 'GKOS', 'PRCT', 'KRYS', 'AXSM',
+  // Energy and materials
+  'AROC', 'CIVI', 'CRC', 'CRK', 'GPOR', 'KOS', 'LBRT', 'MGY', 'MUR', 'NOG',
+  'OII', 'PTEN', 'RIG', 'SM', 'TALO', 'WHD', 'WKC', 'BTU', 'HCC', 'ASH',
+  'AVNT', 'CBT', 'HWKN', 'IOSP', 'KALU', 'TROX', 'WOR', 'SLVM', 'ESI', 'SXT',
+  // REITs and utilities
+  'AHH', 'APLE', 'BNL', 'DEA', 'GTY', 'IIPR', 'LXP', 'PECO', 'SKT', 'UE',
+  'NWE', 'OGS', 'POR', 'AVA', 'BKH', 'MGEE', 'NJR', 'SWX', 'SR',
+];

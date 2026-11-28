@@ -90,7 +90,7 @@ export function renderDigest(result: RunResult): string {
     lines.push('## New finds', '');
     const found = result.rows.filter((row) => row.discovered);
     lines.push(
-      `Scanned ${d.scanned} large US stocks beyond the watchlist; ${d.liquid} passed the price and volume checks.`,
+      `Scanned ${d.scanned} US stocks beyond the watchlist; ${d.liquid} passed the price and volume checks.`,
       '',
     );
     if (found.length === 0) {

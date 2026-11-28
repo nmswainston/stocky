@@ -2,7 +2,7 @@
 // Research only: nothing in src/research can place, change or cancel
 // an order. The guard test in no-orders.test.ts keeps it that way.
 
-import { LARGE_CAP_UNIVERSE } from './universe.js';
+import { LARGE_CAP_UNIVERSE, SMALL_CAP_UNIVERSE } from './universe.js';
 
 const DEFAULT_WATCHLIST = [
   'AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL',
@@ -28,6 +28,15 @@ function switchFromEnv(name: string, fallback: boolean): boolean {
   throw new Error(`${name} must be on or off, got ${process.env[name]}`);
 }
 
+export type UniverseMode = 'large' | 'small' | 'both';
+
+function universeModeFromEnv(): UniverseMode {
+  const raw = process.env.RESEARCH_UNIVERSE?.trim().toLowerCase();
+  if (raw === undefined || raw === '' || raw === 'large') return 'large';
+  if (raw === 'small' || raw === 'both') return raw;
+  throw new Error(`RESEARCH_UNIVERSE must be large, small or both, got ${process.env.RESEARCH_UNIVERSE}`);
+}
+
 function numberFromEnv(name: string, fallback: number): number {
   const raw = process.env[name];
   if (raw === undefined || raw.trim() === '') return fallback;
@@ -40,8 +49,19 @@ function numberFromEnv(name: string, fallback: number): number {
 
 // Read lazily so tests and the CLI can set process.env first.
 export function researchConfig() {
+  // Which built-in list discovery scans: the ~100 large caps, the ~200
+  // smaller names, or both. An explicit STOCKY_DISCOVERY_UNIVERSE list
+  // still wins over the mode.
+  const universeMode = universeModeFromEnv();
+  const builtInUniverse =
+    universeMode === 'large'
+      ? LARGE_CAP_UNIVERSE
+      : universeMode === 'small'
+        ? SMALL_CAP_UNIVERSE
+        : [...new Set([...LARGE_CAP_UNIVERSE, ...SMALL_CAP_UNIVERSE])];
   return {
     watchlist: listFromEnv('STOCKY_WATCHLIST') ?? DEFAULT_WATCHLIST,
+    universeMode,
     // Relative strength and the digest's market line are measured against this.
     benchmark: 'SPY',
     // Only the most interesting names get a Claude write-up each day;
@@ -58,13 +78,16 @@ export function researchConfig() {
       enabled: switchFromEnv('RESEARCH_DISCOVERY', true),
       // At most this many discovered names join the day's list.
       add: Math.round(numberFromEnv('RESEARCH_DISCOVERY_ADD', 3)),
-      universe: listFromEnv('STOCKY_DISCOVERY_UNIVERSE') ?? LARGE_CAP_UNIVERSE,
-      // No penny stocks: last close at least this many dollars.
-      minPrice: 10,
+      universe: listFromEnv('STOCKY_DISCOVERY_UNIVERSE') ?? builtInUniverse,
+      // No penny stocks: last close at least this many dollars. Small
+      // caps get a lower floor, still well above penny territory.
+      minPrice: universeMode === 'large' ? 10 : 5,
       // Average daily dollar volume over 20 sessions, as seen on Alpaca's
       // free IEX feed. IEX carries only a few percent of all US trading,
       // so $2M there is roughly $50M or more across the whole market.
-      minDollarVolume: 2_000_000,
+      // Small caps trade thinner: the $500k floor is roughly $12M or
+      // more market-wide, enough to keep spreads sane.
+      minDollarVolume: universeMode === 'large' ? 2_000_000 : 500_000,
       // Same scale as the watchlist's interest score. 2 is about a two
       // sigma five day move, or a smaller move with heavy volume and news.
       minInterest: numberFromEnv('RESEARCH_DISCOVERY_MIN_INTEREST', 2),

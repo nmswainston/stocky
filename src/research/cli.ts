@@ -6,6 +6,7 @@ import { fetchDailyBars, fetchNews } from './alpaca.js';
 import { researchConfig } from './config.js';
 import { Edgar } from './edgar.js';
 import { loadDotEnv, readSecrets } from './env.js';
+import { heartbeatPinger } from './heartbeat.js';
 import { renderDigest } from './render.js';
 import { runResearch, type RunSources } from './run.js';
 
@@ -30,77 +31,96 @@ if (asOfDate !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(asOfDate)) {
 }
 // 12:30 UTC is the timer's usual run time: before the US open all year.
 const now = asOfDate ? new Date(`${asOfDate}T12:30:00.000Z`) : new Date();
-const config = researchConfig();
-const secrets = readSecrets({ needClaude: !dryRun });
-const symbols = args.get('symbols')?.split(',').map((symbol) => symbol.trim().toUpperCase()).filter(Boolean);
-const limit = args.has('limit') ? numberArg(args, 'limit', config.researchPerDay) : undefined;
 
-const alpaca = { keyId: secrets.alpacaKeyId, secretKey: secrets.alpacaSecretKey };
-const edgar = new Edgar(secrets.secUserAgent, config.paths.edgarCacheDirectory);
-const sources: RunSources = {
-  dailyBars: (list, start, end) => fetchDailyBars(alpaca, list, start, end),
-  news: (symbol, start, end, max) => fetchNews(alpaca, [symbol], start, end, max),
-  recentNews: (list, start, end, max) => fetchNews(alpaca, list, start, end, max),
-  company: (symbol) => edgar.lookup(symbol),
-  filings: (cik, since, asOfDate) => edgar.recentFilings(cik, since, asOfDate),
-  facts: (cik, asOfDate, quarters) => edgar.quarterlyFacts(cik, asOfDate, quarters),
-};
-const writer =
-  dryRun || !secrets.anthropicApiKey
-    ? null
-    : claudeThesisWriter({
-        apiKey: secrets.anthropicApiKey,
-        model: config.model,
-        effort: config.effort,
-        maxOutputTokens: config.maxOutputTokens,
-      });
-
-const runOptions: Parameters<typeof runResearch>[3] = {
-  now,
+// Dead-man alert for the scheduled run only. Dry runs and as-of replays
+// are manual experiments and must not touch the check: a stray success
+// ping from one could hide a real run that never happened.
+const scheduledStyleRun = !dryRun && asOfDate === undefined;
+const heartbeat = heartbeatPinger(scheduledStyleRun ? process.env.RESEARCH_HEARTBEAT_URL : null, {
   log: (line) => console.error(line),
-};
-if (symbols && symbols.length > 0) runOptions.symbols = symbols;
-if (limit !== undefined) runOptions.limit = limit;
-if (args.has('no-discovery')) runOptions.discover = false;
+});
 
-const result = await runResearch(config, sources, writer, runOptions);
-
-// Everything the digest was built from, so any score can be traced back
-// to the exact data and prompt behind it.
-const runDirectory = asOfDate
-  ? path.resolve(config.paths.researchDirectory, 'as-of', result.marketDate)
-  : path.resolve(config.paths.researchDirectory, result.marketDate);
-await mkdir(path.join(runDirectory, 'prompts'), { recursive: true });
-await writeFile(path.join(runDirectory, 'theses.json'), JSON.stringify(result.theses, null, 2));
-await writeFile(path.join(runDirectory, 'snapshots.json'), JSON.stringify(result.snapshots, null, 2));
-await writeFile(
-  path.join(runDirectory, 'run.json'),
-  JSON.stringify(
-    {
-      asOf: result.asOf,
-      model: result.model,
-      dryRun: result.dryRun,
-      asOfRun: asOfDate !== undefined,
-      costUsd: result.costUsd,
-      budgetUsd: result.budgetUsd,
-      tokens: result.tokens,
-      skipped: result.skipped,
-      discovery: result.discovery,
-      watchlist: result.rows,
-    },
-    null,
-    2,
-  ),
-);
-for (const item of result.prompts) {
-  await writeFile(path.join(runDirectory, 'prompts', `${item.symbol}.txt`), item.prompt);
+try {
+  await main();
+  await heartbeat.success();
+} catch (error) {
+  await heartbeat.fail();
+  throw error;
 }
 
-const digest = renderDigest(result);
-const digestsDirectory = path.resolve(config.paths.digestsDirectory);
-await mkdir(digestsDirectory, { recursive: true });
-const suffix = `${asOfDate ? '-as-of' : ''}${result.dryRun ? '-dry-run' : ''}`;
-const digestPath = path.join(digestsDirectory, `research-${result.marketDate}${suffix}.md`);
-await writeFile(digestPath, digest);
-console.log(digest);
-console.error(`written ${digestPath}`);
+async function main(): Promise<void> {
+  const config = researchConfig();
+  const secrets = readSecrets({ needClaude: !dryRun });
+  const symbols = args.get('symbols')?.split(',').map((symbol) => symbol.trim().toUpperCase()).filter(Boolean);
+  const limit = args.has('limit') ? numberArg(args, 'limit', config.researchPerDay) : undefined;
+
+  const alpaca = { keyId: secrets.alpacaKeyId, secretKey: secrets.alpacaSecretKey };
+  const edgar = new Edgar(secrets.secUserAgent, config.paths.edgarCacheDirectory);
+  const sources: RunSources = {
+    dailyBars: (list, start, end) => fetchDailyBars(alpaca, list, start, end),
+    news: (symbol, start, end, max) => fetchNews(alpaca, [symbol], start, end, max),
+    recentNews: (list, start, end, max) => fetchNews(alpaca, list, start, end, max),
+    company: (symbol) => edgar.lookup(symbol),
+    filings: (cik, since, asOfDate) => edgar.recentFilings(cik, since, asOfDate),
+    facts: (cik, asOfDate, quarters) => edgar.quarterlyFacts(cik, asOfDate, quarters),
+  };
+  const writer =
+    dryRun || !secrets.anthropicApiKey
+      ? null
+      : claudeThesisWriter({
+          apiKey: secrets.anthropicApiKey,
+          model: config.model,
+          effort: config.effort,
+          maxOutputTokens: config.maxOutputTokens,
+        });
+
+  const runOptions: Parameters<typeof runResearch>[3] = {
+    now,
+    log: (line) => console.error(line),
+  };
+  if (symbols && symbols.length > 0) runOptions.symbols = symbols;
+  if (limit !== undefined) runOptions.limit = limit;
+  if (args.has('no-discovery')) runOptions.discover = false;
+
+  const result = await runResearch(config, sources, writer, runOptions);
+
+  // Everything the digest was built from, so any score can be traced back
+  // to the exact data and prompt behind it.
+  const runDirectory = asOfDate
+    ? path.resolve(config.paths.researchDirectory, 'as-of', result.marketDate)
+    : path.resolve(config.paths.researchDirectory, result.marketDate);
+  await mkdir(path.join(runDirectory, 'prompts'), { recursive: true });
+  await writeFile(path.join(runDirectory, 'theses.json'), JSON.stringify(result.theses, null, 2));
+  await writeFile(path.join(runDirectory, 'snapshots.json'), JSON.stringify(result.snapshots, null, 2));
+  await writeFile(
+    path.join(runDirectory, 'run.json'),
+    JSON.stringify(
+      {
+        asOf: result.asOf,
+        model: result.model,
+        dryRun: result.dryRun,
+        asOfRun: asOfDate !== undefined,
+        costUsd: result.costUsd,
+        budgetUsd: result.budgetUsd,
+        tokens: result.tokens,
+        skipped: result.skipped,
+        discovery: result.discovery,
+        watchlist: result.rows,
+      },
+      null,
+      2,
+    ),
+  );
+  for (const item of result.prompts) {
+    await writeFile(path.join(runDirectory, 'prompts', `${item.symbol}.txt`), item.prompt);
+  }
+
+  const digest = renderDigest(result);
+  const digestsDirectory = path.resolve(config.paths.digestsDirectory);
+  await mkdir(digestsDirectory, { recursive: true });
+  const suffix = `${asOfDate ? '-as-of' : ''}${result.dryRun ? '-dry-run' : ''}`;
+  const digestPath = path.join(digestsDirectory, `research-${result.marketDate}${suffix}.md`);
+  await writeFile(digestPath, digest);
+  console.log(digest);
+  console.error(`written ${digestPath}`);
+}

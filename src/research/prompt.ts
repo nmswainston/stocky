@@ -35,8 +35,13 @@ export interface PriorPromptView {
 
 // Entry at the first session's open on or after the prior thesis date,
 // exit at the latest close: the same entry convention the scorecard
-// grades with. Null when the window does not cover the prior date.
+// grades with. Null when the window does not cover the prior date,
+// including a window that STARTS after it: entering at the window's
+// first bar would mislabel a partial return as performance since the
+// thesis.
 function returnSince(bars: DailyBar[], sinceDate: string): number | null {
+  const first = bars[0];
+  if (!first || first.date > sinceDate) return null;
   const entry = bars.find((bar) => bar.date >= sinceDate);
   const last = bars[bars.length - 1];
   if (!entry || !last || entry.date >= last.date) return null;

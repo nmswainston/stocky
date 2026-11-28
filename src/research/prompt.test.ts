@@ -31,4 +31,13 @@ describe('priorForPrompt', () => {
     expect(view.stock_return_since).toBeNull();
     expect(view.vs_benchmark_since).toBeNull();
   });
+
+  it('reports null performance when the window starts after the prior date', () => {
+    // A prior older than the fetched history: entering at the window's
+    // first bar would mislabel a partial return as the full one.
+    const bars = dailyBars([100, 101, 102], '2026-06-10');
+    const view = priorForPrompt(prior, bars, bars);
+    expect(view.stock_return_since).toBeNull();
+    expect(view.vs_benchmark_since).toBeNull();
+  });
 });

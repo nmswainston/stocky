@@ -200,6 +200,11 @@ export async function runResearch(
   const tokens = { input: 0, output: 0 };
   const systemTokens = estimateTokens(SYSTEM_PROMPT);
 
+  // Prior performance sees only bars strictly before the as-of date,
+  // the cutoff buildSnapshot already applies, so an as-of replay can
+  // never leak the replay day's close into its own prompt.
+  const beforeAsOf = (list: DailyBar[]): DailyBar[] => list.filter((bar) => bar.date < asOfDate);
+
   for (const [index, symbol] of picked.entries()) {
     // Budget routing: the first premiumPerDay picks (forced filings,
     // then highest interest) get the premium model, the rest the cheap
@@ -209,7 +214,7 @@ export async function runResearch(
     const prior = options.priorTheses?.get(symbol);
     const prompt = snapshotForPrompt(
       snapshot,
-      prior ? priorForPrompt(prior, allBars.get(symbol) ?? [], benchmarkBars) : null,
+      prior ? priorForPrompt(prior, beforeAsOf(allBars.get(symbol) ?? []), beforeAsOf(benchmarkBars)) : null,
     );
     const estimatedTokens = systemTokens + estimateTokens(prompt);
     prompts.push({ symbol, prompt, estimatedTokens });

@@ -32,6 +32,16 @@ describe('priorForPrompt', () => {
     expect(view.vs_benchmark_since).toBeNull();
   });
 
+  it('enters at the next session when the prior was written after the open', () => {
+    const bars = dailyBars([100, 101, 102, 103, 104]);
+    const spy = dailyBars([100, 100, 100, 100, 100]);
+    // Same date as the pre-open case, but stamped 20:00 UTC: entry
+    // moves to 2026-06-04's open (102), so 06-03's already-observed
+    // move is not claimed. 104/102 - 1 = 1.96%.
+    const view = priorForPrompt({ ...prior, asOf: '2026-06-03T20:00:00.000Z' }, bars, spy);
+    expect(view.stock_return_since).toBe('1.96%');
+  });
+
   it('reports null performance when the window starts after the prior date', () => {
     // A prior older than the fetched history: entering at the window's
     // first bar would mislabel a partial return as the full one.

@@ -33,16 +33,21 @@ export interface PriorPromptView {
   vs_benchmark_since: string | null;
 }
 
-// Entry at the first session's open on or after the prior thesis date,
-// exit at the latest close: the same entry convention the scorecard
-// grades with. Null when the window does not cover the prior date,
-// including a window that STARTS after it: entering at the window's
-// first bar would mislabel a partial return as performance since the
-// thesis.
-function returnSince(bars: DailyBar[], sinceDate: string): number | null {
+// Entry at the first session open the prior thesis could actually have
+// traded: its own date's open when it was published before the US open
+// (the scheduled run writes at 12:30 UTC; the NYSE opens at 13:30 or
+// 14:30 UTC depending on the season), otherwise the NEXT session's, so
+// movement already observable at publication is never counted as
+// performance since. Exit at the latest close. Null when the window
+// does not cover the prior date, including a window that STARTS after
+// it: entering at the window's first bar would mislabel a partial
+// return as performance since the thesis.
+function returnSince(bars: DailyBar[], asOf: string): number | null {
+  const sinceDate = asOf.slice(0, 10);
+  const beforeOpen = asOf.slice(11, 16) < '13:30';
   const first = bars[0];
   if (!first || first.date > sinceDate) return null;
-  const entry = bars.find((bar) => bar.date >= sinceDate);
+  const entry = bars.find((bar) => (beforeOpen ? bar.date >= sinceDate : bar.date > sinceDate));
   const last = bars[bars.length - 1];
   if (!entry || !last || entry.date >= last.date) return null;
   return last.close / entry.open - 1;
@@ -50,8 +55,8 @@ function returnSince(bars: DailyBar[], sinceDate: string): number | null {
 
 export function priorForPrompt(prior: PriorThesis, bars: DailyBar[], benchmarkBars: DailyBar[]): PriorPromptView {
   const sinceDate = prior.asOf.slice(0, 10);
-  const stock = returnSince(bars, sinceDate);
-  const benchmark = returnSince(benchmarkBars, sinceDate);
+  const stock = returnSince(bars, prior.asOf);
+  const benchmark = returnSince(benchmarkBars, prior.asOf);
   return {
     written: sinceDate,
     score: prior.score,

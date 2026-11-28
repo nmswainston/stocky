@@ -217,6 +217,7 @@ async function loadScorecard() {
   tables.replaceChildren();
   const metaParts = [
     `Every thesis graded against ${summary.benchmark}: entry at the next open after it was written, exit N sessions later.`,
+    'Positive is scores +2 and up, negative -2 and down.',
     `${summary.liveTheses} ${summary.liveTheses === 1 ? 'thesis' : 'theses'} on file.`,
   ];
   if (summary.asOfExcluded > 0) metaParts.push(`${summary.asOfExcluded} as-of replays excluded.`);
@@ -240,8 +241,11 @@ async function loadScorecard() {
     const body = make('tbody');
     for (const bucket of entry.buckets) {
       if (bucket.count === 0) continue;
+      // "Positive (+2 to +5)" reads fine on a desktop but forces the
+      // last column off a phone screen; one word fits everywhere.
+      const word = bucket.label.split(' ')[0];
       body.append(make('tr', {}, [
-        make('th', { text: bucket.label, attrs: { scope: 'row' } }),
+        make('th', { text: word, attrs: { scope: 'row', title: bucket.label } }),
         make('td', { text: String(bucket.count), className: 'num' }),
         make('td', { text: `${Math.round(bucket.hitRate * 100)}%`, className: 'num' }),
         make('td', { text: pct(bucket.meanExcess), className: `num ${tone(bucket.meanExcess)}` }),

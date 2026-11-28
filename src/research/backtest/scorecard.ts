@@ -95,6 +95,47 @@ export function gradeTheses(
   return graded;
 }
 
+// The research page's track record panel: every live thesis graded at
+// several horizons, bucketed by score. As-of replays are excluded here,
+// whatever the CLI report shows, because a thesis written about the
+// past can lean on the model's memory of what happened next.
+
+export interface HorizonSummary {
+  horizon: number;
+  graded: number;
+  // Too recent for the horizon, or missing bars.
+  ungraded: number;
+  buckets: ScoreBucket[];
+}
+
+export interface ScorecardSummary {
+  generatedAt: string;
+  benchmark: string;
+  liveTheses: number;
+  asOfExcluded: number;
+  horizons: HorizonSummary[];
+}
+
+export function scorecardSummary(
+  saved: SavedThesis[],
+  bars: Map<string, DailyBar[]>,
+  benchmark: string,
+  horizons: number[],
+  generatedAt: string,
+): ScorecardSummary {
+  const live = saved.filter((item) => !item.asOfRun);
+  return {
+    generatedAt,
+    benchmark,
+    liveTheses: live.length,
+    asOfExcluded: saved.length - live.length,
+    horizons: horizons.map((horizon) => {
+      const graded = gradeTheses(live, bars, benchmark, horizon);
+      return { horizon, graded: graded.length, ungraded: live.length - graded.length, buckets: bucketize(graded) };
+    }),
+  };
+}
+
 export function bucketize(graded: GradedThesis[]): ScoreBucket[] {
   const buckets: { label: string; test: (score: number) => boolean }[] = [
     { label: 'Positive (+2 to +5)', test: (score) => score >= 2 },

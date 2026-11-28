@@ -119,6 +119,7 @@ data/
   logs/                  supervisor child logs
   digests/               crypto digests and research-YYYY-MM-DD.md stock digests
   research/YYYY-MM-DD/   theses, snapshots, prompts and cost for each research run
+  research/scorecard.json  track record for the research page, refreshed each scheduled run
   research/cache/edgar/  SEC responses, reused for 20 hours
 ```
 
@@ -160,6 +161,11 @@ The rules that keep it honest:
   every allowed output token) is checked against the daily budget.
 - **Traceable.** Each run saves the exact prompts, snapshots and token
   counts, so any score can be traced back to what it was based on.
+- **Remembers itself.** Each prompt includes the model's most recent
+  live thesis on that stock and how the stock has done against SPY
+  since, so write-ups build on each other instead of starting cold
+  every day. Context only, never citable, and an as-of replay never
+  sees a thesis from its future.
 
 ### Setup
 
@@ -182,6 +188,10 @@ The rules that keep it honest:
    against, and numbered sources you can tap; the watchlist table sits
    below. It is read only, works on a phone, and follows the phone's
    light or dark mode.
+6. Optional: a phone push when the scheduled run finishes, with the
+   day's scores and a tap-through to the page. Set `RESEARCH_NTFY_URL`
+   (an ntfy topic URL) and `RESEARCH_PAGE_URL` in `.env`; see
+   `.env.example`.
 
 ### Discovery (new finds)
 
@@ -226,6 +236,13 @@ Two honest ways to check the research, neither of which spends on Claude:
   minus SPY's over the next 20 sessions, grouped by score. Positive
   theses should beat SPY and negative ones should trail it.
 
+The same grading feeds the research page's Track record panel: each
+scheduled run refreshes `data/research/scorecard.json` with live theses
+graded at 5, 20 and 60 sessions (as-of replays excluded), and
+`/research.html` shows hit rate and average excess per score bucket.
+The theses only deserve attention once that panel says they beat a coin
+flip.
+
 Claude itself is not backtested on purpose. A model shown a 2024 snapshot
 already knows how 2024 ended, so its old theses look smarter than they
 were. The real test is the live digests, graded forward. `npm run
@@ -239,6 +256,10 @@ The watchlist is today's large caps, picked with hindsight
 Defaults: 20 large US stocks plus up to 3 new finds, 8 researched a day, Claude Sonnet 5.5,
 $0.75 a day cap (roughly $5 to $15 a month in practice). All settings
 are in `src/research/config.ts` and can be overridden in `.env`.
+Setting `RESEARCH_BUDGET_MODEL` (for example Haiku, about 20x cheaper)
+routes every pick after the top `RESEARCH_PREMIUM_PER_DAY` to it, so
+the same cap covers more names; each saved thesis records which model
+wrote it.
 
 ## Design rules that keep the numbers honest
 

@@ -3,12 +3,15 @@ import path from 'node:path';
 import { parseArgs, numberArg } from '../cli-args.js';
 import { claudeThesisWriter } from './agent.js';
 import { fetchDailyBars, fetchNews } from './alpaca.js';
+import { loadSavedTheses, scorecardSummary } from './backtest/scorecard.js';
 import { researchConfig } from './config.js';
 import { Edgar } from './edgar.js';
 import { loadDotEnv, readSecrets } from './env.js';
 import { heartbeatPinger } from './heartbeat.js';
+import { pushMessage, sendPush } from './notify.js';
 import { renderDigest } from './render.js';
 import { runResearch, type RunSources } from './run.js';
+import type { PriorThesis } from './types.js';
 
 // Daily stock research digest. Research only: reads market data, news
 // and SEC filings, asks Claude for a cited thesis on the most active
@@ -82,6 +85,30 @@ async function main(): Promise<void> {
   if (limit !== undefined) runOptions.limit = limit;
   if (args.has('no-discovery')) runOptions.discover = false;
 
+  // Thesis memory: the model's most recent live thesis per symbol goes
+  // back into its prompt. Strictly earlier than this run's as-of time,
+  // so an --as-of replay can never see a thesis from its future.
+  try {
+    const saved = await loadSavedTheses(path.resolve(config.paths.researchDirectory));
+    const priorTheses = new Map<string, PriorThesis>();
+    const cutoff = now.toISOString();
+    const usable = saved
+      .filter((item) => !item.asOfRun && item.asOf < cutoff)
+      .sort((a, b) => a.asOf.localeCompare(b.asOf));
+    for (const item of usable) {
+      priorTheses.set(item.thesis.symbol, {
+        asOf: item.asOf,
+        score: item.thesis.score,
+        confidence: item.thesis.confidence,
+        summary: item.thesis.summary,
+        watchFor: item.thesis.watchFor,
+      });
+    }
+    if (priorTheses.size > 0) runOptions.priorTheses = priorTheses;
+  } catch (error) {
+    console.error(`prior theses unavailable: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
   const result = await runResearch(config, sources, writer, runOptions);
 
   // Everything the digest was built from, so any score can be traced back
@@ -98,6 +125,7 @@ async function main(): Promise<void> {
       {
         asOf: result.asOf,
         model: result.model,
+        budgetModel: result.budgetModel,
         dryRun: result.dryRun,
         asOfRun: asOfDate !== undefined,
         costUsd: result.costUsd,
@@ -123,4 +151,36 @@ async function main(): Promise<void> {
   await writeFile(digestPath, digest);
   console.log(digest);
   console.error(`written ${digestPath}`);
+
+  // Refresh the track record the research page shows: every live thesis
+  // graded against the benchmark at a few horizons. Free market data,
+  // no Claude calls, and a failure here never fails a saved run.
+  if (scheduledStyleRun) {
+    try {
+      const saved = await loadSavedTheses(path.resolve(config.paths.researchDirectory));
+      const live = saved.filter((item) => !item.asOfRun);
+      if (live.length > 0) {
+        const thesisSymbols = [...new Set(live.map((item) => item.thesis.symbol))];
+        const earliest = (live.map((item) => item.asOf).sort()[0] as string).slice(0, 10);
+        const gradeBars = await fetchDailyBars(alpaca, [...thesisSymbols, config.benchmark], earliest, new Date().toISOString());
+        const summary = scorecardSummary(saved, gradeBars, config.benchmark, [5, 20, 60], new Date().toISOString());
+        await writeFile(
+          path.resolve(config.paths.researchDirectory, 'scorecard.json'),
+          JSON.stringify(summary, null, 2),
+        );
+        console.error(`scorecard refreshed: ${live.length} live theses`);
+      }
+    } catch (error) {
+      console.error(`scorecard refresh failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  // Phone push for the scheduled run only, after everything is saved:
+  // the digest is the record, the push is just the doorbell.
+  if (scheduledStyleRun) {
+    await sendPush(process.env.RESEARCH_NTFY_URL, pushMessage(result), {
+      clickUrl: process.env.RESEARCH_PAGE_URL ?? null,
+      log: (line) => console.error(line),
+    });
+  }
 }

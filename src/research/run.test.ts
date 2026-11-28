@@ -38,9 +38,11 @@ function sources(barsBySymbol: Record<string, DailyBar[]>): RunSources & { newsC
 
 function writer(score: number, usage = { input_tokens: 4_000, output_tokens: 1_500 }) {
   const prompts: string[] = [];
+  const models: (string | undefined)[] = [];
   const impl: ThesisWriter = {
-    async write(prompt): Promise<ThesisReply> {
+    async write(prompt, model): Promise<ThesisReply> {
       prompts.push(prompt);
+      models.push(model);
       const symbol = /Write the thesis for (\S+)\./.exec(prompt)?.[1] ?? '';
       return {
         json: {
@@ -56,7 +58,7 @@ function writer(score: number, usage = { input_tokens: 4_000, output_tokens: 1_5
       };
     },
   };
-  return { impl, prompts };
+  return { impl, prompts, models };
 }
 
 const bars: Record<string, DailyBar[]> = {
@@ -108,6 +110,63 @@ describe('runResearch', () => {
     expect(result.theses).toEqual([]);
     expect(result.prompts).toHaveLength(2);
     expect(result.costUsd).toBe(0);
+  });
+
+  it('routes picks past premiumPerDay to the budget model and records it', async () => {
+    const { impl, models } = writer(1);
+    const result = await runResearch(
+      config({ budgetModel: 'claude-haiku-5-5', premiumPerDay: 1 }),
+      sources(bars),
+      impl,
+      { now: NOW, limit: 3 },
+    );
+    expect(models).toEqual(['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-haiku-5-5']);
+    expect(result.theses.map((thesis) => thesis.model)).toEqual([
+      'claude-sonnet-5-5',
+      'claude-haiku-5-5',
+      'claude-haiku-5-5',
+    ]);
+    expect(result.budgetModel).toBe('claude-haiku-5-5');
+  });
+
+  it('uses the premium model for every pick when no budget model is set', async () => {
+    const { impl, models } = writer(1);
+    await runResearch(config(), sources(bars), impl, { now: NOW, limit: 2 });
+    expect(models).toEqual(['claude-sonnet-5-5', 'claude-sonnet-5-5']);
+  });
+
+  it('feeds the prior thesis into the prompt, and only for its symbol', async () => {
+    const { impl, prompts } = writer(2);
+    const priorTheses = new Map([
+      ['JUMP', { asOf: '2026-08-25T12:30:00.000Z', score: 3, confidence: 'medium' as const, summary: 'Prior view.', watchFor: ['earnings'] }],
+    ]);
+    await runResearch(config(), sources(bars), impl, { now: NOW, limit: 2, priorTheses });
+    const jump = prompts.find((prompt) => prompt.includes('Write the thesis for JUMP.'));
+    expect(jump).toContain('prior_thesis');
+    expect(jump).toContain('Prior view.');
+    expect(jump).toContain('stock_return_since');
+    for (const other of prompts.filter((prompt) => prompt !== jump)) {
+      expect(other).not.toContain('prior_thesis');
+    }
+  });
+
+  it('never lets prior performance see bars on or after the as-of date', async () => {
+    // 95 daily bars from 2026-06-01 run past NOW (2026-09-01): closes
+    // 100 + i, opens one behind. The last usable session is 08-31.
+    const longBars = dailyBars(rampCloses(95, 100, 1));
+    const flatSpy = dailyBars(rampCloses(95, 400, 0));
+    const priorTheses = new Map([
+      ['JUMP', { asOf: '2026-08-25T12:30:00.000Z', score: 2, confidence: 'low' as const, summary: 'Prior.', watchFor: [] }],
+    ]);
+    const result = await runResearch(
+      config({ watchlist: ['JUMP'] }),
+      sources({ SPY: flatSpy, JUMP: longBars }),
+      null,
+      { now: NOW, limit: 1, discover: false, priorTheses },
+    );
+    // Entry at 08-25's open (184), exit at 08-31's close (191), and
+    // never at the 09-01 to 09-03 bars: 191/184 - 1 = 3.80%.
+    expect(result.prompts[0]?.prompt).toContain('"stock_return_since": "3.80%"');
   });
 
   it('records data problems instead of failing the run', async () => {

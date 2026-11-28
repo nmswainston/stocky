@@ -137,9 +137,10 @@ export function renderDigest(result: RunResult): string {
     lines.push('');
   }
 
+  const models = result.budgetModel ? `${result.model} and ${result.budgetModel}` : result.model;
   lines.push('## Cost', '');
   lines.push(
-    `${result.model}: ${result.tokens.input.toLocaleString('en-US')} input and ` +
+    `${models}: ${result.tokens.input.toLocaleString('en-US')} input and ` +
       `${result.tokens.output.toLocaleString('en-US')} output tokens, $${result.costUsd.toFixed(3)} ` +
       `of a $${result.budgetUsd.toFixed(2)} daily cap.`,
     '',

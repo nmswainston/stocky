@@ -46,12 +46,15 @@ export async function sendPush(
   const headers: Record<string, string> = { Title: message.title };
   if (options.clickUrl) headers.Click = options.clickUrl;
   try {
-    await fetcher(url, {
+    const response = await fetcher(url, {
       method: 'POST',
       headers,
       body: message.body,
       signal: AbortSignal.timeout(10_000),
     });
+    // fetch resolves on HTTP errors; a 401 or 429 is still a failed
+    // delivery and deserves a log line.
+    if (!response.ok) log(`push notification rejected: HTTP ${response.status}`);
   } catch (error) {
     log(`push notification failed: ${error instanceof Error ? error.message : String(error)}`);
   }

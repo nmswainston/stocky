@@ -51,6 +51,13 @@ describe('sendPush', () => {
     expect(calls[0]?.init.headers).toEqual({ Title: 'Hi', Click: 'https://pi.example/research.html' });
   });
 
+  it('logs an HTTP error status without throwing', async () => {
+    const lines: string[] = [];
+    const fetcher = (async () => new Response('too many', { status: 429 })) as typeof fetch;
+    await sendPush('https://ntfy.example/stocky', { title: 'x', body: 'y' }, { fetcher, log: (line) => lines.push(line) });
+    expect(lines).toEqual(['push notification rejected: HTTP 429']);
+  });
+
   it('does nothing without a URL and swallows send errors', async () => {
     let called = false;
     const fetcher = (async () => {

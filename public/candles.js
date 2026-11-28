@@ -1,6 +1,7 @@
 // Candlestick and volume rendering. Uses the lightweight-charts v5
 // standalone global. This module never fetches; app.js feeds it.
 
+import { PAGE_FRIENDLY_INTERACTION } from './chart-interaction.js';
 import { toChartTime } from './time.js';
 
 const COLORS = {
@@ -26,6 +27,7 @@ export function createPriceChart(container) {
     },
     timeScale: { timeVisible: true, secondsVisible: false },
     crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    ...PAGE_FRIENDLY_INTERACTION,
   });
 
   const candles = chart.addSeries(LightweightCharts.CandlestickSeries, {

@@ -2,6 +2,7 @@
 // baseline on one chart, because "am I beating doing nothing" is the
 // only paper trading question that matters.
 
+import { PAGE_FRIENDLY_INTERACTION } from './chart-interaction.js';
 import { toChartTime } from './time.js';
 
 const COLORS = {
@@ -20,6 +21,7 @@ export function createPaperChart(container) {
       horzLines: { color: COLORS.grid },
     },
     timeScale: { timeVisible: true, secondsVisible: false },
+    ...PAGE_FRIENDLY_INTERACTION,
   });
 
   const strategySeries = chart.addSeries(LightweightCharts.LineSeries, {

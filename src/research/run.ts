@@ -3,10 +3,10 @@ import type { ResearchConfig } from './config.js';
 import { Budget, estimateTokens } from './cost.js';
 import { discover, type DiscoveryResult } from './discovery.js';
 import { interestScore, pickForResearch } from './features.js';
-import { snapshotForPrompt, SYSTEM_PROMPT } from './prompt.js';
+import { priorForPrompt, snapshotForPrompt, SYSTEM_PROMPT } from './prompt.js';
 import { buildSnapshot } from './snapshot.js';
 import { validateThesis } from './thesis.js';
-import type { DailyBar, Features, Filing, NewsItem, QuarterFact, Snapshot, Thesis } from './types.js';
+import type { DailyBar, Features, Filing, NewsItem, PriorThesis, QuarterFact, Snapshot, Thesis } from './types.js';
 
 // One research run: collect, screen, research, validate. Every outside
 // call comes in through RunSources so tests run offline, and nothing in
@@ -81,7 +81,16 @@ export async function runResearch(
   config: ResearchConfig,
   sources: RunSources,
   writer: ThesisWriter | null,
-  options: { now: Date; symbols?: string[]; limit?: number; discover?: boolean; log?: (line: string) => void },
+  options: {
+    now: Date;
+    symbols?: string[];
+    limit?: number;
+    discover?: boolean;
+    // Most recent live thesis per symbol, shown back to the model so
+    // today's write-up builds on its last one instead of starting cold.
+    priorTheses?: Map<string, PriorThesis>;
+    log?: (line: string) => void;
+  },
 ): Promise<RunResult> {
   const log = options.log ?? (() => {});
   const { now } = options;
@@ -190,7 +199,11 @@ export async function runResearch(
 
   for (const symbol of picked) {
     const snapshot = snapshots.find((item) => item.symbol === symbol) as Snapshot;
-    const prompt = snapshotForPrompt(snapshot);
+    const prior = options.priorTheses?.get(symbol);
+    const prompt = snapshotForPrompt(
+      snapshot,
+      prior ? priorForPrompt(prior, allBars.get(symbol) ?? [], benchmarkBars) : null,
+    );
     const estimatedTokens = systemTokens + estimateTokens(prompt);
     prompts.push({ symbol, prompt, estimatedTokens });
     if (!writer) continue; // dry run: build prompts, call nothing

@@ -161,6 +161,11 @@ The rules that keep it honest:
   every allowed output token) is checked against the daily budget.
 - **Traceable.** Each run saves the exact prompts, snapshots and token
   counts, so any score can be traced back to what it was based on.
+- **Remembers itself.** Each prompt includes the model's most recent
+  live thesis on that stock and how the stock has done against SPY
+  since, so write-ups build on each other instead of starting cold
+  every day. Context only, never citable, and an as-of replay never
+  sees a thesis from its future.
 
 ### Setup
 

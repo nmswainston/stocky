@@ -110,6 +110,21 @@ describe('runResearch', () => {
     expect(result.costUsd).toBe(0);
   });
 
+  it('feeds the prior thesis into the prompt, and only for its symbol', async () => {
+    const { impl, prompts } = writer(2);
+    const priorTheses = new Map([
+      ['JUMP', { asOf: '2026-08-25T12:30:00.000Z', score: 3, confidence: 'medium' as const, summary: 'Prior view.', watchFor: ['earnings'] }],
+    ]);
+    await runResearch(config(), sources(bars), impl, { now: NOW, limit: 2, priorTheses });
+    const jump = prompts.find((prompt) => prompt.includes('Write the thesis for JUMP.'));
+    expect(jump).toContain('prior_thesis');
+    expect(jump).toContain('Prior view.');
+    expect(jump).toContain('stock_return_since');
+    for (const other of prompts.filter((prompt) => prompt !== jump)) {
+      expect(other).not.toContain('prior_thesis');
+    }
+  });
+
   it('records data problems instead of failing the run', async () => {
     const broken = sources(bars);
     broken.news = async () => {

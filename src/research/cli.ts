@@ -11,6 +11,7 @@ import { heartbeatPinger } from './heartbeat.js';
 import { pushMessage, sendPush } from './notify.js';
 import { renderDigest } from './render.js';
 import { runResearch, type RunSources } from './run.js';
+import type { PriorThesis } from './types.js';
 
 // Daily stock research digest. Research only: reads market data, news
 // and SEC filings, asks Claude for a cited thesis on the most active
@@ -83,6 +84,30 @@ async function main(): Promise<void> {
   if (symbols && symbols.length > 0) runOptions.symbols = symbols;
   if (limit !== undefined) runOptions.limit = limit;
   if (args.has('no-discovery')) runOptions.discover = false;
+
+  // Thesis memory: the model's most recent live thesis per symbol goes
+  // back into its prompt. Strictly earlier than this run's as-of time,
+  // so an --as-of replay can never see a thesis from its future.
+  try {
+    const saved = await loadSavedTheses(path.resolve(config.paths.researchDirectory));
+    const priorTheses = new Map<string, PriorThesis>();
+    const cutoff = now.toISOString();
+    const usable = saved
+      .filter((item) => !item.asOfRun && item.asOf < cutoff)
+      .sort((a, b) => a.asOf.localeCompare(b.asOf));
+    for (const item of usable) {
+      priorTheses.set(item.thesis.symbol, {
+        asOf: item.asOf,
+        score: item.thesis.score,
+        confidence: item.thesis.confidence,
+        summary: item.thesis.summary,
+        watchFor: item.thesis.watchFor,
+      });
+    }
+    if (priorTheses.size > 0) runOptions.priorTheses = priorTheses;
+  } catch (error) {
+    console.error(`prior theses unavailable: ${error instanceof Error ? error.message : String(error)}`);
+  }
 
   const result = await runResearch(config, sources, writer, runOptions);
 

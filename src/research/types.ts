@@ -88,3 +88,14 @@ export interface Thesis {
   verified: boolean;
   problems: string[];
 }
+
+// The model's own most recent live thesis on a symbol, fed back into
+// the next prompt for continuity. Carries no sources on purpose: it is
+// context, not citable evidence.
+export interface PriorThesis {
+  asOf: string; // ISO, when it was written
+  score: number;
+  confidence: Thesis['confidence'];
+  summary: string;
+  watchFor: string[];
+}

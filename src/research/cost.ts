@@ -35,25 +35,29 @@ export function estimateTokens(text: string): number {
 export class Budget {
   spent = 0;
 
+  // Every model that may bill against this budget is validated up
+  // front, so an unknown price fails the run before any call is made.
   constructor(
     readonly limitUsd: number,
     private readonly model: string,
+    extraModels: (string | null)[] = [],
   ) {
     pricesFor(model);
+    for (const extra of extraModels) if (extra) pricesFor(extra);
   }
 
   // Worst case for the next call: the whole prompt plus every output
   // token we allow (thinking counts as output).
-  worstCase(promptTokens: number, maxOutputTokens: number): number {
-    return costOf(this.model, { input_tokens: promptTokens, output_tokens: maxOutputTokens });
+  worstCase(promptTokens: number, maxOutputTokens: number, model = this.model): number {
+    return costOf(model, { input_tokens: promptTokens, output_tokens: maxOutputTokens });
   }
 
-  canAfford(promptTokens: number, maxOutputTokens: number): boolean {
-    return this.spent + this.worstCase(promptTokens, maxOutputTokens) <= this.limitUsd;
+  canAfford(promptTokens: number, maxOutputTokens: number, model = this.model): boolean {
+    return this.spent + this.worstCase(promptTokens, maxOutputTokens, model) <= this.limitUsd;
   }
 
-  record(usage: UsageLike): number {
-    const cost = costOf(this.model, usage);
+  record(usage: UsageLike, model = this.model): number {
+    const cost = costOf(model, usage);
     this.spent += cost;
     return cost;
   }

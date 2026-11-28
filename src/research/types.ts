@@ -87,4 +87,18 @@ export interface Thesis {
   watchFor: string[];
   verified: boolean;
   problems: string[];
+  // Which model wrote it, recorded since budget routing can vary this
+  // within one run. Absent on theses saved before it existed.
+  model?: string;
+}
+
+// The model's own most recent live thesis on a symbol, fed back into
+// the next prompt for continuity. Carries no sources on purpose: it is
+// context, not citable evidence.
+export interface PriorThesis {
+  asOf: string; // ISO, when it was written
+  score: number;
+  confidence: Thesis['confidence'];
+  summary: string;
+  watchFor: string[];
 }

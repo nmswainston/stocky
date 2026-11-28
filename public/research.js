@@ -193,8 +193,8 @@ function renderFinds(day) {
   section.hidden = false;
   const found = day.watchlist.filter((row) => row.discovered);
   $('finds-meta').textContent = found.length > 0
-    ? `Added from a scan of ${scan.scanned} large US stocks beyond your watchlist. Marked New in the table below.`
-    : `Scanned ${scan.scanned} large US stocks beyond your watchlist. Nothing unusual enough to add today.`;
+    ? `Added from a scan of ${scan.scanned} US stocks beyond your watchlist. Marked New in the table below.`
+    : `Scanned ${scan.scanned} US stocks beyond your watchlist. Nothing unusual enough to add today.`;
   for (const row of found) {
     const status = row.researched ? 'researched above' : 'not researched today';
     list.append(make('li', { text: `${row.symbol}: ${row.discoveryReason ?? 'unusual activity'}, ${status}.` }));

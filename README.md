@@ -223,6 +223,19 @@ Settings, all optional in `.env`: `RESEARCH_DISCOVERY=off` turns it off,
 `STOCKY_DISCOVERY_UNIVERSE=...` replaces the list (for example with the
 whole S&P 500). A `--symbols` run skips discovery.
 
+### Small caps
+
+`RESEARCH_UNIVERSE=small` swaps the scan list for about 200 smaller,
+lesser-known US names (small and mid caps, curated for liquidity), and
+`both` scans the two lists together. The liquidity floor loosens to a
+$5 close and about $500k of average daily IEX volume, which is roughly
+$12M or more across the whole market, still far from penny-stock
+territory. Honest caveats: the free IEX feed carries only a few percent
+of US trading, so prices and volume ratios are noisier for thin names,
+news coverage is sparser, and the built-in list is point-in-time, so
+names that get acquired or delisted simply stop producing bars and drop
+out of the scan. EDGAR fundamentals work the same at every size.
+
 ### Backtest and scorecard
 
 Two honest ways to check the research, neither of which spends on Claude:

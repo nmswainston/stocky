@@ -256,6 +256,10 @@ The watchlist is today's large caps, picked with hindsight
 Defaults: 20 large US stocks plus up to 3 new finds, 8 researched a day, Claude Sonnet 5.5,
 $0.75 a day cap (roughly $5 to $15 a month in practice). All settings
 are in `src/research/config.ts` and can be overridden in `.env`.
+Setting `RESEARCH_BUDGET_MODEL` (for example Haiku, about 20x cheaper)
+routes every pick after the top `RESEARCH_PREMIUM_PER_DAY` to it, so
+the same cap covers more names; each saved thesis records which model
+wrote it.
 
 ## Design rules that keep the numbers honest
 

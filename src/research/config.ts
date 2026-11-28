@@ -77,6 +77,11 @@ export function researchConfig() {
       batchSize: 50,
     },
     model: process.env.RESEARCH_MODEL ?? 'claude-sonnet-5-5',
+    // Stretch the budget: when set, only the first premiumPerDay picks
+    // (forced filings first, then highest interest) use `model`; the
+    // rest use this cheaper one. Unset means every pick uses `model`.
+    budgetModel: process.env.RESEARCH_BUDGET_MODEL ?? null,
+    premiumPerDay: Math.round(numberFromEnv('RESEARCH_PREMIUM_PER_DAY', 3)),
     effort: 'medium' as const,
     maxOutputTokens: 6_000,
     history: {

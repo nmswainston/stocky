@@ -48,6 +48,9 @@ export interface RunResult {
   marketDate: string;
   asOf: string;
   model: string;
+  // The cheaper model picks past premiumPerDay were routed to, when
+  // budget routing was on for this run.
+  budgetModel: string | null;
   dryRun: boolean;
   budgetUsd: number;
   costUsd: number;
@@ -190,14 +193,18 @@ export async function runResearch(
   );
   log(`screen picked ${picked.join(', ') || 'nothing'}`);
 
-  const budget = new Budget(config.dailyBudgetUsd, config.model);
+  const budget = new Budget(config.dailyBudgetUsd, config.model, [config.budgetModel]);
   const theses: Thesis[] = [];
   const skipped: RunResult['skipped'] = [];
   const prompts: RunResult['prompts'] = [];
   const tokens = { input: 0, output: 0 };
   const systemTokens = estimateTokens(SYSTEM_PROMPT);
 
-  for (const symbol of picked) {
+  for (const [index, symbol] of picked.entries()) {
+    // Budget routing: the first premiumPerDay picks (forced filings,
+    // then highest interest) get the premium model, the rest the cheap
+    // one. With no budget model configured, every pick is premium.
+    const model = config.budgetModel && index >= config.premiumPerDay ? config.budgetModel : config.model;
     const snapshot = snapshots.find((item) => item.symbol === symbol) as Snapshot;
     const prior = options.priorTheses?.get(symbol);
     const prompt = snapshotForPrompt(
@@ -207,17 +214,18 @@ export async function runResearch(
     const estimatedTokens = systemTokens + estimateTokens(prompt);
     prompts.push({ symbol, prompt, estimatedTokens });
     if (!writer) continue; // dry run: build prompts, call nothing
-    if (!budget.canAfford(estimatedTokens, config.maxOutputTokens)) {
+    if (!budget.canAfford(estimatedTokens, config.maxOutputTokens, model)) {
       skipped.push({ symbol, reason: `daily budget of $${config.dailyBudgetUsd.toFixed(2)} reached` });
       continue;
     }
     try {
-      log(`researching ${symbol}`);
-      const reply = await writer.write(prompt);
-      const cost = budget.record(reply.usage);
+      log(`researching ${symbol} with ${model}`);
+      const reply = await writer.write(prompt, model);
+      const cost = budget.record(reply.usage, model);
       tokens.input += reply.usage.input_tokens;
       tokens.output += reply.usage.output_tokens;
       const thesis = validateThesis(reply.json, snapshot);
+      thesis.model = model;
       if (reply.json === null) {
         thesis.problems.unshift(`no usable answer (stop reason ${reply.stopReason ?? 'unknown'})`);
         thesis.verified = false;
@@ -246,6 +254,7 @@ export async function runResearch(
     marketDate: marketDateOf(now),
     asOf,
     model: config.model,
+    budgetModel: config.budgetModel,
     dryRun: writer === null,
     budgetUsd: config.dailyBudgetUsd,
     costUsd: budget.spent,

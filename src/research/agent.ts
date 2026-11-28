@@ -13,7 +13,9 @@ export interface ThesisReply {
 }
 
 export interface ThesisWriter {
-  write(userPrompt: string): Promise<ThesisReply>;
+  // model overrides the writer's default for this one call, so budget
+  // routing can mix models inside a single run.
+  write(userPrompt: string, model?: string): Promise<ThesisReply>;
 }
 
 export function claudeThesisWriter(options: {
@@ -24,9 +26,9 @@ export function claudeThesisWriter(options: {
 }): ThesisWriter {
   const client = new Anthropic({ apiKey: options.apiKey, maxRetries: 3 });
   return {
-    async write(userPrompt) {
+    async write(userPrompt, model) {
       const response = await client.messages.create({
-        model: options.model,
+        model: model ?? options.model,
         max_tokens: options.maxOutputTokens,
         system: SYSTEM_PROMPT,
         output_config: {

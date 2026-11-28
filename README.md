@@ -182,6 +182,10 @@ The rules that keep it honest:
    against, and numbered sources you can tap; the watchlist table sits
    below. It is read only, works on a phone, and follows the phone's
    light or dark mode.
+6. Optional: a phone push when the scheduled run finishes, with the
+   day's scores and a tap-through to the page. Set `RESEARCH_NTFY_URL`
+   (an ntfy topic URL) and `RESEARCH_PAGE_URL` in `.env`; see
+   `.env.example`.
 
 ### Discovery (new finds)
 

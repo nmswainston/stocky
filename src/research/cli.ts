@@ -7,6 +7,7 @@ import { researchConfig } from './config.js';
 import { Edgar } from './edgar.js';
 import { loadDotEnv, readSecrets } from './env.js';
 import { heartbeatPinger } from './heartbeat.js';
+import { pushMessage, sendPush } from './notify.js';
 import { renderDigest } from './render.js';
 import { runResearch, type RunSources } from './run.js';
 
@@ -123,4 +124,13 @@ async function main(): Promise<void> {
   await writeFile(digestPath, digest);
   console.log(digest);
   console.error(`written ${digestPath}`);
+
+  // Phone push for the scheduled run only, after everything is saved:
+  // the digest is the record, the push is just the doorbell.
+  if (scheduledStyleRun) {
+    await sendPush(process.env.RESEARCH_NTFY_URL, pushMessage(result), {
+      clickUrl: process.env.RESEARCH_PAGE_URL ?? null,
+      log: (line) => console.error(line),
+    });
+  }
 }

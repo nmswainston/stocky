@@ -34,10 +34,15 @@ describe('researchConfig universe modes', () => {
     expect(config.discovery.minPrice).toBe(5);
   });
 
-  it('an explicit STOCKY_DISCOVERY_UNIVERSE list wins over the mode', () => {
+  it('an explicit STOCKY_DISCOVERY_UNIVERSE list wins and reports as custom', () => {
     process.env.RESEARCH_UNIVERSE = 'small';
     process.env.STOCKY_DISCOVERY_UNIVERSE = 'orcl, crm';
-    expect(researchConfig().discovery.universe).toEqual(['ORCL', 'CRM']);
+    const config = researchConfig();
+    expect(config.discovery.universe).toEqual(['ORCL', 'CRM']);
+    // Never passed off as a built-in list, while the mode still sets
+    // the liquidity thresholds.
+    expect(config.universeMode).toBe('custom');
+    expect(config.discovery.minPrice).toBe(5);
   });
 
   it('rejects an unknown mode', () => {

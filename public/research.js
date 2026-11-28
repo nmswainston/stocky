@@ -41,6 +41,7 @@ const UNIVERSE_LABELS = {
   large: 'the large-cap list',
   small: 'the small-cap list',
   both: 'the large and small-cap lists',
+  custom: 'a custom list',
 };
 
 // 'claude-sonnet-5-5' reads as 'Sonnet 5.5'; anything unexpected shows

@@ -47,9 +47,10 @@ export interface DiscoverySummary {
 export interface RunResult {
   marketDate: string;
   asOf: string;
-  // Which built-in scan lists this run used, so a day's finds can be
-  // read against the universe that produced them.
-  universeMode: UniverseMode;
+  // Which scan lists this run used (a built-in mode, or custom for a
+  // STOCKY_DISCOVERY_UNIVERSE list), so a day's finds can be read
+  // against the universe that produced them.
+  universeMode: UniverseMode | 'custom';
   model: string;
   // The cheaper model picks past premiumPerDay were routed to, when
   // budget routing was on for this run.

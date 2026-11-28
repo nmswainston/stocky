@@ -17,6 +17,7 @@ const UNIVERSE_LABELS = {
   large: 'the large-cap list',
   small: 'the small-cap list',
   both: 'the large and small-cap lists',
+  custom: 'a custom list',
 } as const;
 
 function trim(text: string, max: number): string {

@@ -1,5 +1,5 @@
 import type { ThesisWriter } from './agent.js';
-import type { ResearchConfig } from './config.js';
+import type { ResearchConfig, UniverseMode } from './config.js';
 import { Budget, estimateTokens } from './cost.js';
 import { discover, type DiscoveryResult } from './discovery.js';
 import { interestScore, pickForResearch } from './features.js';
@@ -47,6 +47,9 @@ export interface DiscoverySummary {
 export interface RunResult {
   marketDate: string;
   asOf: string;
+  // Which built-in scan lists this run used, so a day's finds can be
+  // read against the universe that produced them.
+  universeMode: UniverseMode;
   model: string;
   // The cheaper model picks past premiumPerDay were routed to, when
   // budget routing was on for this run.
@@ -258,6 +261,7 @@ export async function runResearch(
   return {
     marketDate: marketDateOf(now),
     asOf,
+    universeMode: config.universeMode,
     model: config.model,
     budgetModel: config.budgetModel,
     dryRun: writer === null,

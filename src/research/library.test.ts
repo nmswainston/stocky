@@ -114,6 +114,9 @@ describe('research library', () => {
     expect(top.lastClose).toBe(101.5);
     expect(day?.watchlist[0]?.return20d).toBe(0.04);
     expect(day?.costUsd).toBe(0.12);
+    // Days and theses saved before these fields existed read as null.
+    expect(day?.universeMode).toBeNull();
+    expect(top.model).toBeNull();
   });
 
   it('numbers each source once per thesis, in order of first use', async () => {
@@ -149,12 +152,14 @@ describe('research library', () => {
     ];
     await writeDay(
       '2026-09-03',
-      { dryRun: false, watchlist: rows, discovery: { scanned: 100, liquid: 96, secChecked: 25, added: ['NEW'], problems: [] } },
-      [thesis('NEW', 2)],
+      { dryRun: false, universeMode: 'both', watchlist: rows, discovery: { scanned: 100, liquid: 96, secChecked: 25, added: ['NEW'], problems: [] } },
+      [thesis('NEW', 2, { model: 'claude-haiku-5-5' })],
       [snapshot('NEW')],
     );
     const day = await readResearchDay(directory, '2026-09-03');
     expect(day?.discovery).toEqual({ scanned: 100, liquid: 96, added: ['NEW'] });
+    expect(day?.universeMode).toBe('both');
+    expect(day?.theses[0]?.model).toBe('claude-haiku-5-5');
     expect(day?.theses[0]?.discovered).toBe(true);
     expect(day?.watchlist.map((row) => [row.symbol, row.discovered, row.discoveryReason])).toEqual([
       ['AAA', false, null],

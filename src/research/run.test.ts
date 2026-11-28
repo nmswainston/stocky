@@ -179,6 +179,12 @@ describe('runResearch', () => {
     expect(result.rows.find((row) => row.symbol === 'NOSEC')?.dataProblems.join(' ')).toContain('SEC ticker list');
   });
 
+  it('records the universe mode and names it in the digest scan line', async () => {
+    const result = await runResearch(config(), sources(bars), null, { now: NOW, limit: 1 });
+    expect(result.universeMode).toBe('large');
+    expect(renderDigest(result)).toContain('US stocks (the large-cap list) beyond the watchlist');
+  });
+
   it('renders a digest with citations and the cost line', async () => {
     const { impl } = writer(3);
     const result = await runResearch(config(), sources(bars), impl, { now: NOW, limit: 1 });

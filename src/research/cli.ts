@@ -142,6 +142,7 @@ async function main(): Promise<void> {
       JSON.stringify(
         {
           asOf: result.asOf,
+          universeMode: result.universeMode,
           model: result.model,
           budgetModel: result.budgetModel,
           dryRun: result.dryRun,

@@ -13,6 +13,13 @@ function signed(score: number): string {
   return score > 0 ? `+${score}` : String(score);
 }
 
+const UNIVERSE_LABELS = {
+  large: 'the large-cap list',
+  small: 'the small-cap list',
+  both: 'the large and small-cap lists',
+  custom: 'a custom list',
+} as const;
+
 function trim(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max - 1)}...` : text;
 }
@@ -90,7 +97,8 @@ export function renderDigest(result: RunResult): string {
     lines.push('## New finds', '');
     const found = result.rows.filter((row) => row.discovered);
     lines.push(
-      `Scanned ${d.scanned} US stocks beyond the watchlist; ${d.liquid} passed the price and volume checks.`,
+      `Scanned ${d.scanned} US stocks (${UNIVERSE_LABELS[result.universeMode]}) beyond the watchlist; ` +
+        `${d.liquid} passed the price and volume checks.`,
       '',
     );
     if (found.length === 0) {

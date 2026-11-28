@@ -59,9 +59,13 @@ export function researchConfig() {
       : universeMode === 'small'
         ? SMALL_CAP_UNIVERSE
         : [...new Set([...LARGE_CAP_UNIVERSE, ...SMALL_CAP_UNIVERSE])];
+  const customUniverse = listFromEnv('STOCKY_DISCOVERY_UNIVERSE');
   return {
     watchlist: listFromEnv('STOCKY_WATCHLIST') ?? DEFAULT_WATCHLIST,
-    universeMode,
+    // What discovery actually scans. A custom STOCKY_DISCOVERY_UNIVERSE
+    // is reported as custom, never passed off as a built-in list; the
+    // RESEARCH_UNIVERSE mode still sets the liquidity thresholds below.
+    universeMode: (customUniverse ? 'custom' : universeMode) as UniverseMode | 'custom',
     // Relative strength and the digest's market line are measured against this.
     benchmark: 'SPY',
     // Only the most interesting names get a Claude write-up each day;
@@ -78,7 +82,7 @@ export function researchConfig() {
       enabled: switchFromEnv('RESEARCH_DISCOVERY', true),
       // At most this many discovered names join the day's list.
       add: Math.round(numberFromEnv('RESEARCH_DISCOVERY_ADD', 3)),
-      universe: listFromEnv('STOCKY_DISCOVERY_UNIVERSE') ?? builtInUniverse,
+      universe: customUniverse ?? builtInUniverse,
       // No penny stocks: last close at least this many dollars. Small
       // caps get a lower floor, still well above penny territory.
       minPrice: universeMode === 'large' ? 10 : 5,

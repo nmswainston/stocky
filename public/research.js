@@ -37,6 +37,21 @@ function shortDate(iso) {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
+const UNIVERSE_LABELS = {
+  large: 'the large-cap list',
+  small: 'the small-cap list',
+  both: 'the large and small-cap lists',
+  custom: 'a custom list',
+};
+
+// 'claude-sonnet-5-5' reads as 'Sonnet 5.5'; anything unexpected shows
+// as it came, never hidden.
+function modelName(model) {
+  const match = /^claude-([a-z]+)-(\d+)-(\d+)$/.exec(model);
+  if (!match) return model;
+  return `${match[1][0].toUpperCase()}${match[1].slice(1)} ${match[2]}.${match[3]}`;
+}
+
 function scoreWord(score) {
   if (score >= 3) return 'strong candidate';
   if (score >= 1) return 'leans positive';
@@ -105,6 +120,7 @@ function thesisCard(thesis) {
   if (thesis.lastClose !== null) facts.push(`Close ${money(thesis.lastClose)}${thesis.lastDate ? ` (${shortDate(thesis.lastDate)})` : ''}`);
   if (thesis.return20d !== null) facts.push(`20 day ${pct(thesis.return20d)}`);
   if (thesis.vsBenchmark20d !== null) facts.push(`vs SPY ${pct(thesis.vsBenchmark20d)}`);
+  if (thesis.model) facts.push(`by ${modelName(thesis.model)}`);
 
   const flagged = thesis.verified
     ? null
@@ -192,9 +208,10 @@ function renderFinds(day) {
   }
   section.hidden = false;
   const found = day.watchlist.filter((row) => row.discovered);
+  const lists = UNIVERSE_LABELS[day.universeMode] ? ` (${UNIVERSE_LABELS[day.universeMode]})` : '';
   $('finds-meta').textContent = found.length > 0
-    ? `Added from a scan of ${scan.scanned} US stocks beyond your watchlist. Marked New in the table below.`
-    : `Scanned ${scan.scanned} US stocks beyond your watchlist. Nothing unusual enough to add today.`;
+    ? `Added from a scan of ${scan.scanned} US stocks${lists} beyond your watchlist. Marked New in the table below.`
+    : `Scanned ${scan.scanned} US stocks${lists} beyond your watchlist. Nothing unusual enough to add today.`;
   for (const row of found) {
     const status = row.researched ? 'researched above' : 'not researched today';
     list.append(make('li', { text: `${row.symbol}: ${row.discoveryReason ?? 'unusual activity'}, ${status}.` }));

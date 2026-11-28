@@ -48,6 +48,8 @@ export interface ThesisView {
   sources: Citation[];
   // Found by the wider scan rather than the watchlist.
   discovered: boolean;
+  // Which model wrote it; null on theses saved before this existed.
+  model: string | null;
 }
 
 export interface WatchView {
@@ -73,6 +75,8 @@ export interface DiscoveryView {
 export interface ResearchDay {
   date: string;
   asOf: string | null;
+  // Which built-in scan lists the run used; null on older days.
+  universeMode: string | null;
   model: string | null;
   dryRun: boolean;
   costUsd: number | null;
@@ -89,6 +93,7 @@ type SavedRow = Omit<WatchRow, 'discovered' | 'discoveryReason'> & Partial<Pick<
 
 interface RunFile {
   asOf?: string;
+  universeMode?: string;
   model?: string;
   dryRun?: boolean;
   costUsd?: number;
@@ -149,6 +154,7 @@ function thesisView(thesis: Thesis, snapshot: Snapshot | undefined, discovered: 
     watchFor: thesis.watchFor,
     verified: thesis.verified,
     problems: thesis.problems,
+    model: thesis.model ?? null,
     lastClose: features?.lastClose ?? null,
     lastDate: features?.lastDate ?? null,
     return20d: features?.return20d ?? null,
@@ -216,6 +222,7 @@ export async function readResearchDay(directory: string, date: string): Promise<
   return {
     date,
     asOf: run.asOf ?? null,
+    universeMode: run.universeMode ?? null,
     model: run.model ?? null,
     dryRun: run.dryRun === true,
     costUsd: run.costUsd ?? null,

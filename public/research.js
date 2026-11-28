@@ -201,6 +201,62 @@ function renderFinds(day) {
   }
 }
 
+// Track record: every live thesis graded against SPY once its horizon
+// has passed. Written by the research run; absent until the first
+// refresh, and the section stays hidden then.
+async function loadScorecard() {
+  let summary;
+  try {
+    const response = await fetch('/api/research/scorecard', { cache: 'no-store' });
+    if (!response.ok) return;
+    summary = await response.json();
+  } catch {
+    return;
+  }
+  const tables = $('record-tables');
+  tables.replaceChildren();
+  const metaParts = [
+    `Every thesis graded against ${summary.benchmark}: entry at the next open after it was written, exit N sessions later.`,
+    `${summary.liveTheses} ${summary.liveTheses === 1 ? 'thesis' : 'theses'} on file.`,
+  ];
+  if (summary.asOfExcluded > 0) metaParts.push(`${summary.asOfExcluded} as-of replays excluded.`);
+  if (summary.generatedAt) metaParts.push(`Refreshed ${shortDate(summary.generatedAt.slice(0, 10))}.`);
+  $('record-meta').textContent = metaParts.join(' ');
+
+  for (const entry of summary.horizons ?? []) {
+    const caption = `${entry.horizon} sessions ahead${entry.ungraded > 0 ? ` (${entry.ungraded} too recent to grade)` : ''}`;
+    if (entry.graded === 0) {
+      tables.append(make('p', { className: 'hint', text: `${caption}: nothing graded yet.` }));
+      continue;
+    }
+    const head = make('thead', {}, [
+      make('tr', {}, [
+        make('th', { text: 'Score', attrs: { scope: 'col' } }),
+        make('th', { text: 'Theses', className: 'num', attrs: { scope: 'col' } }),
+        make('th', { text: `Beat ${summary.benchmark}`, className: 'num', attrs: { scope: 'col' } }),
+        make('th', { text: `Avg vs ${summary.benchmark}`, className: 'num', attrs: { scope: 'col' } }),
+      ]),
+    ]);
+    const body = make('tbody');
+    for (const bucket of entry.buckets) {
+      if (bucket.count === 0) continue;
+      body.append(make('tr', {}, [
+        make('th', { text: bucket.label, attrs: { scope: 'row' } }),
+        make('td', { text: String(bucket.count), className: 'num' }),
+        make('td', { text: `${Math.round(bucket.hitRate * 100)}%`, className: 'num' }),
+        make('td', { text: pct(bucket.meanExcess), className: `num ${tone(bucket.meanExcess)}` }),
+      ]));
+    }
+    tables.append(
+      make('h3', { text: caption }),
+      make('div', { className: 'table-wrap', attrs: { role: 'region', 'aria-label': caption, tabindex: '0' } }, [
+        make('table', {}, [head, body]),
+      ]),
+    );
+  }
+  $('record-section').hidden = false;
+}
+
 async function loadDay(date) {
   $('run-meta').textContent = 'Loading...';
   const response = await fetch(`/api/research/${encodeURIComponent(date)}`, { cache: 'no-store' });
@@ -244,6 +300,7 @@ async function start() {
   select.addEventListener('change', () => loadDay(select.value));
   $('day-form').addEventListener('submit', (event) => event.preventDefault());
   await loadDay(select.value);
+  await loadScorecard();
 }
 
 start();

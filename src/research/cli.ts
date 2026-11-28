@@ -3,6 +3,7 @@ import path from 'node:path';
 import { parseArgs, numberArg } from '../cli-args.js';
 import { claudeThesisWriter } from './agent.js';
 import { fetchDailyBars, fetchNews } from './alpaca.js';
+import { loadSavedTheses, scorecardSummary } from './backtest/scorecard.js';
 import { researchConfig } from './config.js';
 import { Edgar } from './edgar.js';
 import { loadDotEnv, readSecrets } from './env.js';
@@ -124,6 +125,29 @@ async function main(): Promise<void> {
   await writeFile(digestPath, digest);
   console.log(digest);
   console.error(`written ${digestPath}`);
+
+  // Refresh the track record the research page shows: every live thesis
+  // graded against the benchmark at a few horizons. Free market data,
+  // no Claude calls, and a failure here never fails a saved run.
+  if (scheduledStyleRun) {
+    try {
+      const saved = await loadSavedTheses(path.resolve(config.paths.researchDirectory));
+      const live = saved.filter((item) => !item.asOfRun);
+      if (live.length > 0) {
+        const thesisSymbols = [...new Set(live.map((item) => item.thesis.symbol))];
+        const earliest = (live.map((item) => item.asOf).sort()[0] as string).slice(0, 10);
+        const gradeBars = await fetchDailyBars(alpaca, [...thesisSymbols, config.benchmark], earliest, new Date().toISOString());
+        const summary = scorecardSummary(saved, gradeBars, config.benchmark, [5, 20, 60], new Date().toISOString());
+        await writeFile(
+          path.resolve(config.paths.researchDirectory, 'scorecard.json'),
+          JSON.stringify(summary, null, 2),
+        );
+        console.error(`scorecard refreshed: ${live.length} live theses`);
+      }
+    } catch (error) {
+      console.error(`scorecard refresh failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 
   // Phone push for the scheduled run only, after everything is saved:
   // the digest is the record, the push is just the doorbell.

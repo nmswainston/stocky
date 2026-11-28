@@ -119,6 +119,7 @@ data/
   logs/                  supervisor child logs
   digests/               crypto digests and research-YYYY-MM-DD.md stock digests
   research/YYYY-MM-DD/   theses, snapshots, prompts and cost for each research run
+  research/scorecard.json  track record for the research page, refreshed each scheduled run
   research/cache/edgar/  SEC responses, reused for 20 hours
 ```
 
@@ -229,6 +230,13 @@ Two honest ways to check the research, neither of which spends on Claude:
 - `npm run research:scorecard` grades saved theses: the stock's return
   minus SPY's over the next 20 sessions, grouped by score. Positive
   theses should beat SPY and negative ones should trail it.
+
+The same grading feeds the research page's Track record panel: each
+scheduled run refreshes `data/research/scorecard.json` with live theses
+graded at 5, 20 and 60 sessions (as-of replays excluded), and
+`/research.html` shows hit rate and average excess per score bucket.
+The theses only deserve attention once that panel says they beat a coin
+flip.
 
 Claude itself is not backtested on purpose. A model shown a 2024 snapshot
 already knows how 2024 ended, so its old theses look smarter than they

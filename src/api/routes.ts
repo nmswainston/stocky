@@ -207,6 +207,14 @@ export function createRequestHandler(deps: ApiDependencies): http.RequestListene
         return;
       }
 
+      // Track record for the research page, written by the research run.
+      if (route === '/api/research/scorecard') {
+        if (!(await sendFile(response, path.join(deps.researchDirectory, 'scorecard.json')))) {
+          sendJson(response, 404, { error: 'no scorecard yet; it refreshes after each scheduled research run' });
+        }
+        return;
+      }
+
       const researchMatch = /^\/api\/research\/(\d{4}-\d{2}-\d{2})$/.exec(route);
       if (researchMatch) {
         const day = await readResearchDay(deps.researchDirectory, researchMatch[1]!);

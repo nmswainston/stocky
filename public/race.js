@@ -2,6 +2,8 @@
 // percent so different symbols and stakes compare honestly, with the
 // distinct buy-and-hold baselines as dashed gray reference lines.
 
+import { PAGE_FRIENDLY_INTERACTION } from './chart-interaction.js';
+
 const COLORS = {
   grid: '#1b2129',
   text: '#8b949e',
@@ -20,6 +22,7 @@ export function createRaceChart(container) {
     },
     timeScale: { timeVisible: true, secondsVisible: false },
     localization: { priceFormatter: (value) => `${value.toFixed(2)}%` },
+    ...PAGE_FRIENDLY_INTERACTION,
   });
 
   let series = [];

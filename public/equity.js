@@ -1,6 +1,7 @@
 // Equity curve rendering and trade marker construction for a saved
 // backtest result.
 
+import { PAGE_FRIENDLY_INTERACTION } from './chart-interaction.js';
 import { localMinute, toChartTime } from './time.js';
 
 const COLORS = {
@@ -19,6 +20,7 @@ export function createEquityChart(container) {
       horzLines: { color: COLORS.grid },
     },
     timeScale: { timeVisible: true, secondsVisible: false },
+    ...PAGE_FRIENDLY_INTERACTION,
   });
 
   // Baseline at initial equity: green above the starting stake, red

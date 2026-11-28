@@ -48,7 +48,7 @@ export const SMALL_CAP_UNIVERSE = [
   // Software and internet
   'AGYS', 'ALRM', 'ASAN', 'BL', 'BOX', 'BRZE', 'DOCN', 'ENV', 'FIVN', 'FRSH',
   'INTA', 'JAMF', 'NCNO', 'PD', 'PRGS', 'QLYS', 'RPD', 'SPSC', 'SPT', 'TENB',
-  'WK', 'CWAN', 'ZD', 'YELP', 'TRIP', 'UPWK', 'FVRR', 'CARG', 'CARS', 'EB',
+  'WK', 'CWAN', 'ZD', 'YELP', 'TRIP', 'UPWK', 'CARG', 'CARS', 'EB',
   'QNST', 'BMBL', 'GRPN', 'REAL', 'LZ',
   // Consumer and restaurants
   'AEO', 'ANF', 'BJRI', 'BOOT', 'CAKE', 'CBRL', 'COLM', 'CROX', 'DENN', 'DIN',
@@ -66,7 +66,7 @@ export const SMALL_CAP_UNIVERSE = [
   // Health care: biotech, devices, services
   'ACAD', 'AMPH', 'ARWR', 'CORT', 'CPRX', 'DVAX', 'FOLD', 'IRWD', 'LGND', 'MYGN',
   'PCRX', 'PTCT', 'SUPN', 'VCEL', 'XENE', 'OMCL', 'NEOG', 'PGNY', 'ADUS', 'PNTG',
-  'LFST', 'EVH', 'RDNT', 'SDGR', 'TWST', 'PACB', 'CDNA', 'ATEC', 'SIBN', 'INMD',
+  'LFST', 'EVH', 'RDNT', 'SDGR', 'TWST', 'PACB', 'CDNA', 'ATEC', 'SIBN',
   'BLFS', 'TNDM', 'LNTH', 'GKOS', 'PRCT', 'KRYS', 'AXSM',
   // Energy and materials
   'AROC', 'CIVI', 'CRC', 'CRK', 'GPOR', 'KOS', 'LBRT', 'MGY', 'MUR', 'NOG',

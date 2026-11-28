@@ -173,7 +173,10 @@ The rules that keep it honest:
 3. One real stock: `npm run research -- --symbols AAPL --limit 1`
    (about 4 cents on Claude Sonnet 5.5).
 4. Daily: install `scripts/stocky-research.service` and `.timer` (runs
-   weekdays at 12:30 UTC, 5:30 AM in Phoenix).
+   weekdays at 12:30 UTC, 5:30 AM in Phoenix). For an alert when the
+   scheduled run fails or never starts, create a healthchecks.io check
+   on that schedule and set `RESEARCH_HEARTBEAT_URL` in `.env`; see
+   `.env.example`.
 5. Read it: open `/research.html` on the dashboard (linked from the
    header). One card per thesis with its score, the points for and
    against, and numbered sources you can tap; the watchlist table sits

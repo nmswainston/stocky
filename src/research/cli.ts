@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs, numberArg } from '../cli-args.js';
 import { claudeThesisWriter } from './agent.js';
@@ -116,31 +116,50 @@ async function main(): Promise<void> {
   const runDirectory = asOfDate
     ? path.resolve(config.paths.researchDirectory, 'as-of', result.marketDate)
     : path.resolve(config.paths.researchDirectory, result.marketDate);
-  await mkdir(path.join(runDirectory, 'prompts'), { recursive: true });
-  await writeFile(path.join(runDirectory, 'theses.json'), JSON.stringify(result.theses, null, 2));
-  await writeFile(path.join(runDirectory, 'snapshots.json'), JSON.stringify(result.snapshots, null, 2));
-  await writeFile(
-    path.join(runDirectory, 'run.json'),
-    JSON.stringify(
-      {
-        asOf: result.asOf,
-        model: result.model,
-        budgetModel: result.budgetModel,
-        dryRun: result.dryRun,
-        asOfRun: asOfDate !== undefined,
-        costUsd: result.costUsd,
-        budgetUsd: result.budgetUsd,
-        tokens: result.tokens,
-        skipped: result.skipped,
-        discovery: result.discovery,
-        watchlist: result.rows,
-      },
-      null,
-      2,
-    ),
-  );
-  for (const item of result.prompts) {
-    await writeFile(path.join(runDirectory, 'prompts', `${item.symbol}.txt`), item.prompt);
+
+  // Real and dry runs share the day's folder and the last writer used
+  // to win, so a dry run after a real one silently destroyed the day's
+  // theses and exact prompts (it happened 2026-11-27). A dry run now
+  // saves nothing once a real run is on file; its digest below, with
+  // the -dry-run suffix, is still written and printed.
+  let preserveRealRun = false;
+  if (result.dryRun) {
+    try {
+      const existing = JSON.parse(await readFile(path.join(runDirectory, 'run.json'), 'utf8')) as { dryRun?: boolean };
+      preserveRealRun = existing.dryRun === false;
+    } catch {
+      /* nothing saved for this date yet */
+    }
+  }
+  if (preserveRealRun) {
+    console.error(`real run already saved for ${result.marketDate}; dry-run files not written`);
+  } else {
+    await mkdir(path.join(runDirectory, 'prompts'), { recursive: true });
+    await writeFile(path.join(runDirectory, 'theses.json'), JSON.stringify(result.theses, null, 2));
+    await writeFile(path.join(runDirectory, 'snapshots.json'), JSON.stringify(result.snapshots, null, 2));
+    await writeFile(
+      path.join(runDirectory, 'run.json'),
+      JSON.stringify(
+        {
+          asOf: result.asOf,
+          model: result.model,
+          budgetModel: result.budgetModel,
+          dryRun: result.dryRun,
+          asOfRun: asOfDate !== undefined,
+          costUsd: result.costUsd,
+          budgetUsd: result.budgetUsd,
+          tokens: result.tokens,
+          skipped: result.skipped,
+          discovery: result.discovery,
+          watchlist: result.rows,
+        },
+        null,
+        2,
+      ),
+    );
+    for (const item of result.prompts) {
+      await writeFile(path.join(runDirectory, 'prompts', `${item.symbol}.txt`), item.prompt);
+    }
   }
 
   const digest = renderDigest(result);

@@ -38,9 +38,11 @@ function sources(barsBySymbol: Record<string, DailyBar[]>): RunSources & { newsC
 
 function writer(score: number, usage = { input_tokens: 4_000, output_tokens: 1_500 }) {
   const prompts: string[] = [];
+  const models: (string | undefined)[] = [];
   const impl: ThesisWriter = {
-    async write(prompt): Promise<ThesisReply> {
+    async write(prompt, model): Promise<ThesisReply> {
       prompts.push(prompt);
+      models.push(model);
       const symbol = /Write the thesis for (\S+)\./.exec(prompt)?.[1] ?? '';
       return {
         json: {
@@ -56,7 +58,7 @@ function writer(score: number, usage = { input_tokens: 4_000, output_tokens: 1_5
       };
     },
   };
-  return { impl, prompts };
+  return { impl, prompts, models };
 }
 
 const bars: Record<string, DailyBar[]> = {
@@ -108,6 +110,29 @@ describe('runResearch', () => {
     expect(result.theses).toEqual([]);
     expect(result.prompts).toHaveLength(2);
     expect(result.costUsd).toBe(0);
+  });
+
+  it('routes picks past premiumPerDay to the budget model and records it', async () => {
+    const { impl, models } = writer(1);
+    const result = await runResearch(
+      config({ budgetModel: 'claude-haiku-5-5', premiumPerDay: 1 }),
+      sources(bars),
+      impl,
+      { now: NOW, limit: 3 },
+    );
+    expect(models).toEqual(['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-haiku-5-5']);
+    expect(result.theses.map((thesis) => thesis.model)).toEqual([
+      'claude-sonnet-5-5',
+      'claude-haiku-5-5',
+      'claude-haiku-5-5',
+    ]);
+    expect(result.budgetModel).toBe('claude-haiku-5-5');
+  });
+
+  it('uses the premium model for every pick when no budget model is set', async () => {
+    const { impl, models } = writer(1);
+    await runResearch(config(), sources(bars), impl, { now: NOW, limit: 2 });
+    expect(models).toEqual(['claude-sonnet-5-5', 'claude-sonnet-5-5']);
   });
 
   it('feeds the prior thesis into the prompt, and only for its symbol', async () => {

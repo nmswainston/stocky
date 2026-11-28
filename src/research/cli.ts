@@ -125,6 +125,7 @@ async function main(): Promise<void> {
       {
         asOf: result.asOf,
         model: result.model,
+        budgetModel: result.budgetModel,
         dryRun: result.dryRun,
         asOfRun: asOfDate !== undefined,
         costUsd: result.costUsd,
